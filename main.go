@@ -5,8 +5,8 @@ import (
 	"fmt"
 	"os"
 
-	"github.com/Yates-Labs/thunk/internal/git"
-	"github.com/Yates-Labs/thunk/internal/github"
+	"github.com/Yates-Labs/thunk/internal/ingest/git"
+	"github.com/Yates-Labs/thunk/internal/ingest/github"
 )
 
 func main() {
