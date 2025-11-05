@@ -19,3 +19,5 @@ jobs:
         check-latest: true
     - name: Test
       run: go test -v -race ./...
+      env:
+        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
