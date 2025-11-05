@@ -4,8 +4,9 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"regexp"
 	"sort"
-	"strings"
+	"strconv"
 
 	"github.com/google/go-github/v77/github"
 )
@@ -575,20 +576,16 @@ func GetPRsByAuthor(prs []PullRequest, author string) []PullRequest {
 // Looks for patterns like "Fixes #123", "Closes #456", etc.
 func ParseBodyReferences(body string) []int {
 	var refs []int
-	patterns := []string{"fixes", "closes", "resolves", "fix", "close", "resolve", "related to", "see"}
 
-	words := strings.Fields(strings.ToLower(body))
-	for i, word := range words {
-		for _, pattern := range patterns {
-			if word == pattern && i+1 < len(words) {
-				nextWord := words[i+1]
-				if strings.HasPrefix(nextWord, "#") {
-					var num int
-					_, err := fmt.Sscanf(nextWord, "#%d", &num)
-					if err == nil {
-						refs = append(refs, num)
-					}
-				}
+	// Use regex to find #number patterns
+	re := regexp.MustCompile(`#(\d+)`)
+	matches := re.FindAllStringSubmatch(body, -1)
+
+	for _, match := range matches {
+		if len(match) > 1 {
+			num, err := strconv.Atoi(match[1])
+			if err == nil {
+				refs = append(refs, num)
 			}
 		}
 	}
