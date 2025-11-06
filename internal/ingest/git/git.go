@@ -245,11 +245,13 @@ func ParseCommit(commit *object.Commit, includePatch bool) (*Commit, error) {
 		Message:        commit.Message,
 		MessageSubject: subject,
 		MessageBody:    body,
+		CommittedAt:    commit.Committer.When,
 		ParentHashes:   parentHashes,
 		TreeHash:       commit.TreeHash.String(),
 		Diffs:          diffs,
 		Stats:          stats,
 		IsMerge:        commit.NumParents() > 1,
+		Branch:         nil, // Will be set by caller if needed
 	}, nil
 }
 
@@ -318,6 +320,46 @@ func ParseRepository(repo *git.Repository, url string, maxCommits int, includePa
 	if err == nil {
 		headHash = head.Hash().String()
 		headBranch = head.Name().Short()
+	}
+
+	// Associate commits with branches
+	// Create a map of commit hash to branch for quick lookup
+	commitToBranch := make(map[string]*Branch)
+	for i := range branches {
+		branch := &branches[i]
+		// For each branch, get its commit history
+		branchRef, err := repo.Reference(plumbing.NewBranchReferenceName(branch.Name), true)
+		if err != nil {
+			// Try remote branch
+			branchRef, err = repo.Reference(plumbing.NewRemoteReferenceName("origin", branch.Name), true)
+			if err != nil {
+				continue
+			}
+		}
+		
+		// Get commit iterator for this branch
+		commitIter, err := repo.Log(&git.LogOptions{
+			From: branchRef.Hash(),
+		})
+		if err != nil {
+			continue
+		}
+		
+		// Mark all commits in this branch
+		commitIter.ForEach(func(c *object.Commit) error {
+			commitHash := c.Hash.String()
+			if _, exists := commitToBranch[commitHash]; !exists {
+				commitToBranch[commitHash] = branch
+			}
+			return nil
+		})
+	}
+
+	// Assign branch pointers to commits
+	for i := range commits {
+		if branch, exists := commitToBranch[commits[i].Hash]; exists {
+			commits[i].Branch = branch
+		}
 	}
 
 	return &Repository{

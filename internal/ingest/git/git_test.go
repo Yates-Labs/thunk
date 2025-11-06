@@ -88,6 +88,9 @@ func TestParseCommits(t *testing.T) {
 		if commit.Author.When.IsZero() {
 			t.Errorf("Commit %d has zero timestamp", i)
 		}
+		if commit.CommittedAt.IsZero() {
+			t.Errorf("Commit %d has zero committed at timestamp", i)
+		}
 		if commit.Message == "" {
 			t.Errorf("Commit %d has empty message", i)
 		}
@@ -230,6 +233,16 @@ func TestParseRepository(t *testing.T) {
 		t.Errorf("Total commits (%d) doesn't match commits length (%d)",
 			repoData.TotalCommits, len(repoData.Commits))
 	}
+
+	// Verify that commits have branch pointers assigned
+	branchAssignments := 0
+	for _, commit := range repoData.Commits {
+		if commit.Branch != nil {
+			branchAssignments++
+			t.Logf("Commit %s is on branch %s", commit.ShortHash, commit.Branch.Name)
+		}
+	}
+	t.Logf("Branch assignments: %d out of %d commits", branchAssignments, len(repoData.Commits))
 }
 
 func TestGetCommitsByAuthor(t *testing.T) {

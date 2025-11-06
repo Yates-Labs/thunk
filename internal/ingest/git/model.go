@@ -33,11 +33,13 @@ type Commit struct {
 	Message        string      `json:"message"`
 	MessageSubject string      `json:"message_subject"` // First line of message
 	MessageBody    string      `json:"message_body"`    // Rest of message
+	CommittedAt    time.Time   `json:"committed_at"`
 	ParentHashes   []string    `json:"parent_hashes"`
 	TreeHash       string      `json:"tree_hash"`
-	Diffs          []Diff      `json:"diffs"`
-	Stats          CommitStats `json:"stats"`
 	IsMerge        bool        `json:"is_merge"`
+	Branch         *Branch     `json:"branch,omitempty"`
+	Diffs          []Diff      `json:"files_changed"`
+	Stats          CommitStats `json:"stats"`
 }
 
 // CommitStats represents aggregate statistics for a commit
