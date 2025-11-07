@@ -1,6 +1,10 @@
 package cluster
 
-import "time"
+import (
+	"time"
+
+	"github.com/Yates-Labs/thunk/internal/ingest/git"
+)
 
 // SourcePlatform represents the origin platform of repository data
 type SourcePlatform string
@@ -31,54 +35,9 @@ type RepositoryActivity struct {
 	RepositoryName string         `json:"repository_name"`
 	Owner          string         `json:"owner"`
 	DefaultBranch  string         `json:"default_branch"`
-	Commits        []Commit       `json:"commits"`
+	Commits        []git.Commit   `json:"commits"`
 	Artifacts      []Artifact     `json:"artifacts"`
 	FetchedAt      time.Time      `json:"fetched_at"`
-}
-
-// Commit represents a unified code commit across platforms
-// Normalizes commit data from git, GitHub, GitLab, etc.
-type Commit struct {
-	Hash           string       `json:"hash"`
-	ShortHash      string       `json:"short_hash"` // First 8 chars for display
-	Author         Author       `json:"author"`
-	Committer      Author       `json:"committer"`
-	Message        string       `json:"message"`
-	MessageSubject string       `json:"message_subject"` // First line of message
-	MessageBody    string       `json:"message_body"`    // Rest of message
-	CommittedAt    time.Time    `json:"committed_at"`
-	ParentHashes   []string     `json:"parent_hashes"`
-	IsMerge        bool         `json:"is_merge"`
-	Branch         string       `json:"branch,omitempty"`
-	FilesChanged   []FileChange `json:"files_changed"`
-	Stats          CommitStats  `json:"stats"`
-}
-
-// Author represents commit or artifact author information
-type Author struct {
-	Name      string    `json:"name"`
-	Email     string    `json:"email"`
-	Username  string    `json:"username,omitempty"`
-	Timestamp time.Time `json:"timestamp"`
-}
-
-// FileChange represents a file modification in a commit
-type FileChange struct {
-	Path      string `json:"path"`
-	OldPath   string `json:"old_path,omitempty"` // For renames
-	Status    string `json:"status"`             // added, modified, deleted, renamed
-	Additions int    `json:"additions"`
-	Deletions int    `json:"deletions"`
-	IsBinary  bool   `json:"is_binary"`
-	Patch     string `json:"patch,omitempty"` // Actual diff content (optional for large repos)
-}
-
-// CommitStats represents aggregate statistics for a commit
-type CommitStats struct {
-	FilesChanged int `json:"files_changed"`
-	Additions    int `json:"additions"`
-	Deletions    int `json:"deletions"`
-	NetChange    int `json:"net_change"` // Additions - Deletions
 }
 
 // Artifact represents unified development artifacts (issues, PRs, tickets)
@@ -90,7 +49,7 @@ type Artifact struct {
 	Title       string           `json:"title"`
 	Description string           `json:"description"`
 	State       string           `json:"state"` // open, closed, merged
-	Author      Author           `json:"author"`
+	Author      git.Author       `json:"author"`
 	Assignees   []string         `json:"assignees"`
 	Labels      []string         `json:"labels"`
 	CreatedAt   time.Time        `json:"created_at"`
@@ -127,7 +86,7 @@ type ArtifactMetadata struct {
 type Discussion struct {
 	ID        string         `json:"id"`
 	Type      DiscussionType `json:"type"`
-	Author    Author         `json:"author"`
+	Author    git.Author     `json:"author"`
 	Body      string         `json:"body"`
 	CreatedAt time.Time      `json:"created_at"`
 	UpdatedAt time.Time      `json:"updated_at"`
