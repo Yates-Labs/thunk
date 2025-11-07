@@ -152,75 +152,126 @@ func TestEpisode_GetDiscussionAuthors(t *testing.T) {
 
 	tests := []struct {
 		name           string
-		discussions    []Discussion
+		artifacts      []Artifact
 		expectedCount  int
 		expectedEmails map[string]bool
 		description    string
 	}{
 		{
-			name:           "empty discussions",
-			discussions:    []Discussion{},
+			name:           "empty artifacts",
+			artifacts:      []Artifact{},
 			expectedCount:  0,
 			expectedEmails: map[string]bool{},
-			description:    "should return empty slice for no discussions",
+			description:    "should return empty slice for no artifacts",
 		},
 		{
-			name: "single discussion single author",
-			discussions: []Discussion{
+			name: "artifact with no discussions",
+			artifacts: []Artifact{
 				{
-					ID:        "d1",
-					Type:      DiscussionComment,
+					ID:          "a1",
+					Number:      1,
+					Type:        ArtifactIssue,
+					Title:       "Issue with no discussions",
+					Author:      author1,
+					State:       "open",
+					CreatedAt:   time.Now(),
+					Discussions: []Discussion{},
+				},
+			},
+			expectedCount:  0,
+			expectedEmails: map[string]bool{},
+			description:    "should return empty slice when artifacts have no discussions",
+		},
+		{
+			name: "single artifact single discussion",
+			artifacts: []Artifact{
+				{
+					ID:        "a1",
+					Number:    1,
+					Type:      ArtifactIssue,
+					Title:     "Issue 1",
 					Author:    author1,
-					Body:      "Test comment",
+					State:     "open",
 					CreatedAt: time.Now(),
+					Discussions: []Discussion{
+						{
+							ID:        "d1",
+							Type:      DiscussionComment,
+							Author:    author2,
+							Body:      "Test comment",
+							CreatedAt: time.Now(),
+						},
+					},
 				},
 			},
 			expectedCount: 1,
 			expectedEmails: map[string]bool{
-				"alice@example.com": true,
+				"bob@example.com": true,
 			},
-			description: "should return one author for single discussion",
+			description: "should return one author from single discussion",
 		},
 		{
-			name: "multiple discussions same author",
-			discussions: []Discussion{
+			name: "single artifact multiple discussions same author",
+			artifacts: []Artifact{
 				{
-					ID:        "d1",
-					Type:      DiscussionComment,
+					ID:        "a1",
+					Number:    1,
+					Type:      ArtifactIssue,
+					Title:     "Issue 1",
 					Author:    author1,
-					Body:      "Test comment 1",
+					State:     "open",
 					CreatedAt: time.Now(),
-				},
-				{
-					ID:        "d2",
-					Type:      DiscussionReview,
-					Author:    author3, // Same email as author1
-					Body:      "Test review",
-					CreatedAt: time.Now(),
+					Discussions: []Discussion{
+						{
+							ID:        "d1",
+							Type:      DiscussionComment,
+							Author:    author2,
+							Body:      "Comment 1",
+							CreatedAt: time.Now(),
+						},
+						{
+							ID:        "d2",
+							Type:      DiscussionComment,
+							Author:    author2,
+							Body:      "Comment 2",
+							CreatedAt: time.Now(),
+						},
+					},
 				},
 			},
 			expectedCount: 1,
 			expectedEmails: map[string]bool{
-				"alice@example.com": true,
+				"bob@example.com": true,
 			},
 			description: "should deduplicate authors with same email",
 		},
 		{
-			name: "multiple discussions different authors",
-			discussions: []Discussion{
+			name: "single artifact multiple discussions different authors",
+			artifacts: []Artifact{
 				{
-					ID:        "d1",
-					Type:      DiscussionComment,
+					ID:        "a1",
+					Number:    1,
+					Type:      ArtifactPullRequest,
+					Title:     "PR 1",
 					Author:    author1,
-					Body:      "Test comment",
+					State:     "open",
 					CreatedAt: time.Now(),
-				},
-				{
-					ID:        "d2",
-					Type:      DiscussionReview,
-					Author:    author2,
-					Body:      "Test review",
-					CreatedAt: time.Now(),
+					Discussions: []Discussion{
+						{
+							ID:        "d1",
+							Type:      DiscussionComment,
+							Author:    author1,
+							Body:      "Test comment",
+							CreatedAt: time.Now(),
+						},
+						{
+							ID:        "d2",
+							Type:      DiscussionReview,
+							Author:    author2,
+							Body:      "Test review",
+							CreatedAt: time.Now(),
+						},
+					},
 				},
 			},
 			expectedCount: 2,
@@ -228,38 +279,46 @@ func TestEpisode_GetDiscussionAuthors(t *testing.T) {
 				"alice@example.com": true,
 				"bob@example.com":   true,
 			},
-			description: "should return all unique authors",
+			description: "should return all unique authors from discussions",
 		},
 		{
-			name: "multiple discussions mixed authors",
-			discussions: []Discussion{
+			name: "multiple artifacts with discussions",
+			artifacts: []Artifact{
 				{
-					ID:        "d1",
-					Type:      DiscussionComment,
+					ID:        "a1",
+					Number:    1,
+					Type:      ArtifactIssue,
+					Title:     "Issue 1",
 					Author:    author1,
-					Body:      "Comment 1",
+					State:     "open",
 					CreatedAt: time.Now(),
+					Discussions: []Discussion{
+						{
+							ID:        "d1",
+							Type:      DiscussionComment,
+							Author:    author1,
+							Body:      "Comment on issue",
+							CreatedAt: time.Now(),
+						},
+					},
 				},
 				{
-					ID:        "d2",
-					Type:      DiscussionReview,
+					ID:        "a2",
+					Number:    2,
+					Type:      ArtifactPullRequest,
+					Title:     "PR 1",
 					Author:    author2,
-					Body:      "Review 1",
+					State:     "open",
 					CreatedAt: time.Now(),
-				},
-				{
-					ID:        "d3",
-					Type:      DiscussionComment,
-					Author:    author1,
-					Body:      "Comment 2",
-					CreatedAt: time.Now(),
-				},
-				{
-					ID:        "d4",
-					Type:      DiscussionReviewThread,
-					Author:    author2,
-					Body:      "Thread comment",
-					CreatedAt: time.Now(),
+					Discussions: []Discussion{
+						{
+							ID:        "d2",
+							Type:      DiscussionReview,
+							Author:    author2,
+							Body:      "Review comment",
+							CreatedAt: time.Now(),
+						},
+					},
 				},
 			},
 			expectedCount: 2,
@@ -267,15 +326,76 @@ func TestEpisode_GetDiscussionAuthors(t *testing.T) {
 				"alice@example.com": true,
 				"bob@example.com":   true,
 			},
-			description: "should deduplicate multiple discussions from same authors",
+			description: "should aggregate authors across multiple artifacts",
+		},
+		{
+			name: "multiple artifacts mixed discussions",
+			artifacts: []Artifact{
+				{
+					ID:        "a1",
+					Number:    1,
+					Type:      ArtifactIssue,
+					Title:     "Issue 1",
+					Author:    author1,
+					State:     "open",
+					CreatedAt: time.Now(),
+					Discussions: []Discussion{
+						{
+							ID:        "d1",
+							Type:      DiscussionComment,
+							Author:    author1,
+							Body:      "Comment 1",
+							CreatedAt: time.Now(),
+						},
+						{
+							ID:        "d2",
+							Type:      DiscussionComment,
+							Author:    author2,
+							Body:      "Comment 2",
+							CreatedAt: time.Now(),
+						},
+					},
+				},
+				{
+					ID:        "a2",
+					Number:    2,
+					Type:      ArtifactPullRequest,
+					Title:     "PR 1",
+					Author:    author2,
+					State:     "open",
+					CreatedAt: time.Now(),
+					Discussions: []Discussion{
+						{
+							ID:        "d3",
+							Type:      DiscussionReview,
+							Author:    author1,
+							Body:      "Review",
+							CreatedAt: time.Now(),
+						},
+						{
+							ID:        "d4",
+							Type:      DiscussionReviewThread,
+							Author:    author3, // Same as author1
+							Body:      "Thread comment",
+							CreatedAt: time.Now(),
+						},
+					},
+				},
+			},
+			expectedCount: 2,
+			expectedEmails: map[string]bool{
+				"alice@example.com": true,
+				"bob@example.com":   true,
+			},
+			description: "should deduplicate authors across all artifact discussions",
 		},
 	}
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			episode := &Episode{
-				ID:          "test-episode",
-				Discussions: tt.discussions,
+				ID:        "test-episode",
+				Artifacts: tt.artifacts,
 			}
 
 			authors := episode.GetDiscussionAuthors()
@@ -499,6 +619,7 @@ func TestEpisode_AllAuthorMethods(t *testing.T) {
 	author1 := createAuthor("Alice", "alice@example.com")
 	author2 := createAuthor("Bob", "bob@example.com")
 	author3 := createAuthor("Charlie", "charlie@example.com")
+	author4 := createAuthor("Diana", "diana@example.com")
 
 	episode := &Episode{
 		ID: "comprehensive-episode",
@@ -515,6 +636,22 @@ func TestEpisode_AllAuthorMethods(t *testing.T) {
 				Author:    author2, // Same as commit author
 				State:     "open",
 				CreatedAt: time.Now(),
+				Discussions: []Discussion{
+					{
+						ID:        "d1",
+						Type:      DiscussionComment,
+						Author:    author1, // Same as commit author
+						Body:      "Comment on issue",
+						CreatedAt: time.Now(),
+					},
+					{
+						ID:        "d2",
+						Type:      DiscussionComment,
+						Author:    author4, // New author (only in discussions)
+						Body:      "Another comment",
+						CreatedAt: time.Now(),
+					},
+				},
 			},
 			{
 				ID:        "a2",
@@ -524,22 +661,15 @@ func TestEpisode_AllAuthorMethods(t *testing.T) {
 				Author:    author3, // New author
 				State:     "open",
 				CreatedAt: time.Now(),
-			},
-		},
-		Discussions: []Discussion{
-			{
-				ID:        "d1",
-				Type:      DiscussionComment,
-				Author:    author1, // Same as commit author
-				Body:      "Comment",
-				CreatedAt: time.Now(),
-			},
-			{
-				ID:        "d2",
-				Type:      DiscussionReview,
-				Author:    author3, // Same as artifact author
-				Body:      "Review",
-				CreatedAt: time.Now(),
+				Discussions: []Discussion{
+					{
+						ID:        "d3",
+						Type:      DiscussionReview,
+						Author:    author3, // Same as artifact author
+						Body:      "Review comment",
+						CreatedAt: time.Now(),
+					},
+				},
 			},
 		},
 	}
@@ -556,10 +686,10 @@ func TestEpisode_AllAuthorMethods(t *testing.T) {
 		t.Errorf("GetArtifactAuthors() returned %d authors, expected 2", len(artifactAuthors))
 	}
 
-	// Test discussion authors
+	// Test discussion authors - now extracted from artifact discussions
 	discussionAuthors := episode.GetDiscussionAuthors()
-	if len(discussionAuthors) != 2 {
-		t.Errorf("GetDiscussionAuthors() returned %d authors, expected 2", len(discussionAuthors))
+	if len(discussionAuthors) != 3 {
+		t.Errorf("GetDiscussionAuthors() returned %d authors, expected 3", len(discussionAuthors))
 	}
 
 	// Verify that each method returns the correct unique authors
@@ -583,7 +713,7 @@ func TestEpisode_AllAuthorMethods(t *testing.T) {
 	for _, author := range discussionAuthors {
 		discussionEmails[author.Email] = true
 	}
-	if !discussionEmails["alice@example.com"] || !discussionEmails["charlie@example.com"] {
+	if !discussionEmails["alice@example.com"] || !discussionEmails["charlie@example.com"] || !discussionEmails["diana@example.com"] {
 		t.Error("GetDiscussionAuthors() missing expected authors")
 	}
 }

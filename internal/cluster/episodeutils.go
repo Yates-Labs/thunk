@@ -20,14 +20,16 @@ func (e *Episode) GetCommitAuthors() []git.Author {
 	return authorMapToSlice(authorMap)
 }
 
-// GetDiscussionAuthors extracts unique authors from the episode's discussions
+// GetDiscussionAuthors extracts unique authors from discussions within the episode's artifacts
 func (e *Episode) GetDiscussionAuthors() []git.Author {
-	// Discover unique authors from discussions
+	// Discover unique authors from discussions nested in artifacts
 	authorMap := make(map[string]git.Author)
-	for _, discussion := range e.Discussions {
-		key := discussion.Author.Email
-		if _, exists := authorMap[key]; !exists {
-			authorMap[key] = discussion.Author
+	for _, artifact := range e.Artifacts {
+		for _, discussion := range artifact.Discussions {
+			key := discussion.Author.Email
+			if _, exists := authorMap[key]; !exists {
+				authorMap[key] = discussion.Author
+			}
 		}
 	}
 
