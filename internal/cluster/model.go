@@ -128,10 +128,9 @@ type Reactions struct {
 	TotalCount int `json:"total_count"`
 }
 
-// Episode represents a narrative grouping of commits and optionally artifacts and discussions
+// Episode represents a narrative grouping of commits and optionally artifacts
 type Episode struct {
-	ID          string       `json:"id"`
-	Commits     []git.Commit `json:"commits"`
-	Artifacts   []Artifact   `json:"artifacts,omitempty"`
-	Discussions []Discussion `json:"discussions,omitempty"`
+	ID        string       `json:"id"`
+	Commits   []git.Commit `json:"commits"`
+	Artifacts []Artifact   `json:"artifacts,omitempty"`
 }
