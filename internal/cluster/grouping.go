@@ -3,6 +3,7 @@ package cluster
 import (
 	"fmt"
 	"regexp"
+	"sort"
 	"strings"
 	"time"
 
@@ -64,7 +65,6 @@ func (ra *RepositoryActivity) GroupIntoEpisodes(config GroupingConfig) []Episode
 		if currentEpisode == nil {
 			// Start a new episode
 			currentEpisode = &Episode{
-				ID:      fmt.Sprintf("episode-%d", len(episodes)+1),
 				Commits: []git.Commit{commit},
 			}
 			// Check for artifact references
@@ -80,12 +80,12 @@ func (ra *RepositoryActivity) GroupIntoEpisodes(config GroupingConfig) []Episode
 			} else {
 				// Finalize current episode if it meets minimum criteria
 				if len(currentEpisode.Commits) >= config.MinCommits {
+					currentEpisode.ID = fmt.Sprintf("episode-%d", len(episodes)+1)
 					episodes = append(episodes, *currentEpisode)
 				}
 
 				// Start new episode
 				currentEpisode = &Episode{
-					ID:      fmt.Sprintf("episode-%d", len(episodes)+1),
 					Commits: []git.Commit{commit},
 				}
 				addReferencedArtifacts(currentEpisode, commit, artifactRefMap, ra.Artifacts)
@@ -95,6 +95,7 @@ func (ra *RepositoryActivity) GroupIntoEpisodes(config GroupingConfig) []Episode
 		// Check if this is the last commit
 		if i == len(commits)-1 && currentEpisode != nil {
 			if len(currentEpisode.Commits) >= config.MinCommits {
+				currentEpisode.ID = fmt.Sprintf("episode-%d", len(episodes)+1)
 				episodes = append(episodes, *currentEpisode)
 			}
 		}
@@ -105,15 +106,9 @@ func (ra *RepositoryActivity) GroupIntoEpisodes(config GroupingConfig) []Episode
 
 // sortCommitsByTime sorts commits in chronological order (oldest first)
 func sortCommitsByTime(commits []git.Commit) {
-	// Simple bubble sort for clarity (can optimize if needed)
-	n := len(commits)
-	for i := 0; i < n-1; i++ {
-		for j := 0; j < n-i-1; j++ {
-			if commits[j].CommittedAt.After(commits[j+1].CommittedAt) {
-				commits[j], commits[j+1] = commits[j+1], commits[j]
-			}
-		}
-	}
+	sort.Slice(commits, func(i, j int) bool {
+		return commits[i].CommittedAt.Before(commits[j].CommittedAt)
+	})
 }
 
 // calculateEpisodeSimilarity calculates how similar a commit is to an episode
