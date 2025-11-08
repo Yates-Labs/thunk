@@ -592,3 +592,56 @@ func ParseBodyReferences(body string) []int {
 
 	return refs
 }
+
+// ListAllIssues fetches all issues from a repository with pagination
+// This includes both issues and pull requests (GitHub API returns both)
+func ListAllIssues(ctx context.Context, client *github.Client, owner, repo string) ([]*github.Issue, error) {
+	var allIssues []*github.Issue
+
+	opts := &github.IssueListByRepoOptions{
+		State:       "all", // Get both open and closed
+		ListOptions: github.ListOptions{PerPage: 100},
+	}
+
+	for {
+		issues, resp, err := client.Issues.ListByRepo(ctx, owner, repo, opts)
+		if err != nil {
+			return nil, handleAPIError(err, "failed to list issues")
+		}
+
+		allIssues = append(allIssues, issues...)
+
+		if resp.NextPage == 0 {
+			break
+		}
+		opts.ListOptions.Page = resp.NextPage
+	}
+
+	return allIssues, nil
+}
+
+// ListAllPullRequests fetches all pull requests from a repository with pagination
+func ListAllPullRequests(ctx context.Context, client *github.Client, owner, repo string) ([]*github.PullRequest, error) {
+	var allPRs []*github.PullRequest
+
+	opts := &github.PullRequestListOptions{
+		State:       "all", // Get both open and closed
+		ListOptions: github.ListOptions{PerPage: 100},
+	}
+
+	for {
+		prs, resp, err := client.PullRequests.List(ctx, owner, repo, opts)
+		if err != nil {
+			return nil, handleAPIError(err, "failed to list pull requests")
+		}
+
+		allPRs = append(allPRs, prs...)
+
+		if resp.NextPage == 0 {
+			break
+		}
+		opts.ListOptions.Page = resp.NextPage
+	}
+
+	return allPRs, nil
+}

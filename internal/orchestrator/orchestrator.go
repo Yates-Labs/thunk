@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"time"
 
+	"github.com/Yates-Labs/thunk/internal/adapter"
 	"github.com/Yates-Labs/thunk/internal/cluster"
 	"github.com/Yates-Labs/thunk/internal/ingest/git"
 )
@@ -12,20 +13,28 @@ import (
 // AnalyzeRepository analyzes a Git repository and returns grouped episodes
 // The repo parameter can be either a local path or a remote URL
 // Uses default grouping configuration
-func AnalyzeRepository(ctx context.Context, repo string) ([]cluster.Episode, error) {
+// Optional token parameter for accessing platform APIs (GitHub, GitLab, etc.)
+func AnalyzeRepository(ctx context.Context, repo string, token ...string) ([]cluster.Episode, error) {
 	config := cluster.DefaultGroupingConfig()
-	return AnalyzeRepositoryWithConfig(ctx, repo, config)
+	return AnalyzeRepositoryWithConfig(ctx, repo, config, token...)
 }
 
 // AnalyzeRepositoryWithConfig analyzes a repository with custom grouping configuration
-func AnalyzeRepositoryWithConfig(ctx context.Context, repo string, config cluster.GroupingConfig) ([]cluster.Episode, error) {
+// Supports optional token for accessing platform APIs (GitHub, GitLab, etc.)
+func AnalyzeRepositoryWithConfig(ctx context.Context, repo string, config cluster.GroupingConfig, token ...string) ([]cluster.Episode, error) {
 	// Check for context cancellation
 	if err := ctx.Err(); err != nil {
 		return nil, fmt.Errorf("context cancelled before analysis: %w", err)
 	}
 
+	// Extract token if provided
+	var apiToken string
+	if len(token) > 0 {
+		apiToken = token[0]
+	}
+
 	// Step 1: Ingest repository data
-	activity, err := ingestRepository(ctx, repo)
+	activity, err := ingestRepository(ctx, repo, apiToken)
 	if err != nil {
 		return nil, fmt.Errorf("failed to ingest repository: %w", err)
 	}
@@ -43,7 +52,11 @@ func AnalyzeRepositoryWithConfig(ctx context.Context, repo string, config cluste
 
 // ingestRepository handles the ingestion of repository data
 // Supports both local paths and remote URLs
-func ingestRepository(ctx context.Context, repo string) (*cluster.RepositoryActivity, error) {
+// Detects platform from URL and fetches additional artifacts if token is provided
+func ingestRepository(ctx context.Context, repo, token string) (*cluster.RepositoryActivity, error) {
+	// Detect platform from URL
+	platform, owner, repoName := detectPlatform(repo)
+
 	// Try to open as local repository first
 	gitRepo, err := git.OpenRepository(repo)
 	if err != nil {
@@ -63,45 +76,47 @@ func ingestRepository(ctx context.Context, repo string) (*cluster.RepositoryActi
 
 	// Convert to RepositoryActivity
 	activity := &cluster.RepositoryActivity{
-		Platform:       cluster.PlatformGit,
+		Platform:       platform,
 		RepositoryURL:  repo,
-		RepositoryName: extractRepoName(repo),
-		Owner:          "", // Git doesn't have owner concept
+		RepositoryName: repoName,
+		Owner:          owner,
 		DefaultBranch:  repoData.HeadBranch,
 		Commits:        repoData.Commits,
-		Artifacts:      []cluster.Artifact{}, // Git doesn't have artifacts
+		Artifacts:      []cluster.Artifact{},
 		FetchedAt:      time.Now(),
+	}
+
+	// Enrich with platform-specific artifacts if token provided
+	if token != "" && owner != "" && repoName != "" {
+		if err := enrichWithArtifacts(ctx, activity, token, owner, repoName); err != nil {
+			// Log error but don't fail - continue with just git data
+			fmt.Printf("Warning: failed to fetch artifacts from %s: %v\n", platform, err)
+		}
 	}
 
 	return activity, nil
 }
 
-// extractRepoName extracts the repository name from a path or URL
-func extractRepoName(repo string) string {
-	// Remove trailing slash if present
-	if len(repo) > 0 && repo[len(repo)-1] == '/' {
-		repo = repo[:len(repo)-1]
+// enrichWithArtifacts dispatches to platform-specific enrichment based on the activity's platform
+func enrichWithArtifacts(ctx context.Context, activity *cluster.RepositoryActivity, token, owner, repo string) error {
+	var platformAdapter adapter.Adapter
+
+	switch activity.Platform {
+	case cluster.PlatformGitHub:
+		platformAdapter = adapter.NewGitHubAdapter()
+	// ? This is where we would implement other platforms
+	default:
+		return nil
 	}
 
-	// Find the last slash
-	lastSlash := -1
-	for i := len(repo) - 1; i >= 0; i-- {
-		if repo[i] == '/' {
-			lastSlash = i
-			break
-		}
+	// Use the adapter to fetch artifacts
+	artifacts, err := platformAdapter.FetchArtifacts(ctx, token, owner, repo)
+	if err != nil {
+		return fmt.Errorf("failed to fetch artifacts: %w", err)
 	}
 
-	// Extract name after last slash
-	name := repo
-	if lastSlash >= 0 && lastSlash < len(repo)-1 {
-		name = repo[lastSlash+1:]
-	}
+	// Add artifacts to activity
+	activity.Artifacts = append(activity.Artifacts, artifacts...)
 
-	// Remove .git suffix if present
-	if len(name) > 4 && name[len(name)-4:] == ".git" {
-		name = name[:len(name)-4]
-	}
-
-	return name
+	return nil
 }
