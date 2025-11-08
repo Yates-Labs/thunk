@@ -5,7 +5,10 @@ import (
 	"testing"
 	"time"
 
+	"github.com/Yates-Labs/thunk/internal/adapter"
 	"github.com/Yates-Labs/thunk/internal/cluster"
+	"github.com/Yates-Labs/thunk/internal/ingest/git"
+	githubmodel "github.com/Yates-Labs/thunk/internal/ingest/github"
 )
 
 func TestAnalyzeRepository_RealRepo(t *testing.T) {
@@ -181,4 +184,208 @@ func TestAnalyzeRepository_EndToEnd(t *testing.T) {
 	}
 
 	t.Logf("Total commits across all episodes: %d", totalCommits)
+}
+
+// TestGitHubAdapterIntegration demonstrates how the orchestrator uses the adapter
+func TestGitHubAdapterIntegration(t *testing.T) {
+	// Create sample GitHub data
+	issue := &githubmodel.Issue{
+		ID:        12345,
+		Number:    1,
+		Title:     "Sample issue",
+		Body:      "This is a test issue",
+		State:     "open",
+		Author:    "testuser",
+		CreatedAt: time.Now(),
+		UpdatedAt: time.Now(),
+		Labels:    []string{"bug"},
+		Comments: []githubmodel.Comment{
+			{
+				ID:        100,
+				Author:    "reviewer",
+				Body:      "Good catch!",
+				CreatedAt: time.Now(),
+				UpdatedAt: time.Now(),
+			},
+		},
+	}
+
+	pr := &githubmodel.PullRequest{
+		ID:          67890,
+		Number:      2,
+		Title:       "Sample PR",
+		Description: "This is a test PR",
+		State:       "closed",
+		Author:      "developer",
+		BaseBranch:  "main",
+		HeadBranch:  "feature/test",
+		Merged:      true,
+		CreatedAt:   time.Now(),
+		UpdatedAt:   time.Now(),
+	}
+
+	// Create adapter
+	ghAdapter := adapter.NewGitHubAdapter()
+
+	// Convert artifacts
+	issueArtifact, err := ghAdapter.ConvertIssue(issue)
+	if err != nil {
+		t.Fatalf("Failed to convert issue: %v", err)
+	}
+
+	prArtifact, err := ghAdapter.ConvertPullRequest(pr)
+	if err != nil {
+		t.Fatalf("Failed to convert PR: %v", err)
+	}
+	// Create repository activity
+	activity := &cluster.RepositoryActivity{
+		Platform:       ghAdapter.GetPlatform(),
+		RepositoryURL:  "https://github.com/test/repo",
+		RepositoryName: "repo",
+		Owner:          "test",
+		DefaultBranch:  "main",
+		Commits:        []git.Commit{},
+		Artifacts:      []cluster.Artifact{*issueArtifact, *prArtifact},
+		FetchedAt:      time.Now(),
+	}
+
+	// Verify the activity
+	if activity.Platform != cluster.PlatformGitHub {
+		t.Errorf("Expected platform GitHub, got %s", activity.Platform)
+	}
+
+	if len(activity.Artifacts) != 2 {
+		t.Errorf("Expected 2 artifacts, got %d", len(activity.Artifacts))
+	}
+
+	// Verify issue artifact
+	if activity.Artifacts[0].Type != cluster.ArtifactIssue {
+		t.Errorf("Expected first artifact to be issue, got %s", activity.Artifacts[0].Type)
+	}
+
+	if activity.Artifacts[0].Number != 1 {
+		t.Errorf("Expected issue number 1, got %d", activity.Artifacts[0].Number)
+	}
+
+	if len(activity.Artifacts[0].Discussions) != 1 {
+		t.Errorf("Expected 1 discussion on issue, got %d", len(activity.Artifacts[0].Discussions))
+	}
+
+	// Verify PR artifact
+	if activity.Artifacts[1].Type != cluster.ArtifactPullRequest {
+		t.Errorf("Expected second artifact to be PR, got %s", activity.Artifacts[1].Type)
+	}
+
+	if activity.Artifacts[1].State != "merged" {
+		t.Errorf("Expected PR state merged, got %s", activity.Artifacts[1].State)
+	}
+
+	t.Logf("Successfully converted %d artifacts from GitHub", len(activity.Artifacts))
+}
+
+// TestDetectPlatform tests platform detection from URLs
+func TestDetectPlatform(t *testing.T) {
+	tests := []struct {
+		url              string
+		expectedPlatform cluster.SourcePlatform
+		expectedOwner    string
+		expectedRepo     string
+	}{
+		{
+			url:              "https://github.com/Yates-Labs/thunk",
+			expectedPlatform: cluster.PlatformGitHub,
+			expectedOwner:    "Yates-Labs",
+			expectedRepo:     "thunk",
+		},
+		{
+			url:              "git@github.com:Yates-Labs/thunk.git",
+			expectedPlatform: cluster.PlatformGitHub,
+			expectedOwner:    "Yates-Labs",
+			expectedRepo:     "thunk",
+		},
+		{
+			url:              "/local/path/to/repo",
+			expectedPlatform: cluster.PlatformGit,
+			expectedOwner:    "",
+			expectedRepo:     "repo",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.url, func(t *testing.T) {
+			platform, owner, repo := detectPlatform(tt.url)
+			if platform != tt.expectedPlatform {
+				t.Errorf("Expected platform %s, got %s", tt.expectedPlatform, platform)
+			}
+			if owner != tt.expectedOwner {
+				t.Errorf("Expected owner %s, got %s", tt.expectedOwner, owner)
+			}
+			if repo != tt.expectedRepo {
+				t.Errorf("Expected repo %s, got %s", tt.expectedRepo, repo)
+			}
+		})
+	}
+}
+
+// TestParseHostedGitURL tests the generic URL parser
+func TestParseHostedGitURL(t *testing.T) {
+	tests := []struct {
+		url           string
+		host          string
+		expectedOwner string
+		expectedRepo  string
+	}{
+		{
+			url:           "https://github.com/owner/repo",
+			host:          "github.com",
+			expectedOwner: "owner",
+			expectedRepo:  "repo",
+		},
+		{
+			url:           "git@github.com:owner/repo.git",
+			host:          "github.com",
+			expectedOwner: "owner",
+			expectedRepo:  "repo",
+		},
+		{
+			url:           "https://github.com/owner/repo/",
+			host:          "github.com",
+			expectedOwner: "owner",
+			expectedRepo:  "repo",
+		},
+		{
+			url:           "github.com/owner/repo.git",
+			host:          "github.com",
+			expectedOwner: "owner",
+			expectedRepo:  "repo",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.url, func(t *testing.T) {
+			owner, repo := parseHostedGitURL(tt.url, tt.host)
+			if owner != tt.expectedOwner {
+				t.Errorf("Expected owner %s, got %s", tt.expectedOwner, owner)
+			}
+			if repo != tt.expectedRepo {
+				t.Errorf("Expected repo %s, got %s", tt.expectedRepo, repo)
+			}
+		})
+	}
+}
+
+// TestAnalyzeGitHubRepositoryPlaceholder tests the GitHub analysis workflow structure
+func TestAnalyzeGitHubRepositoryPlaceholder(t *testing.T) {
+	// This test verifies the function works with GitHub URLs and tokens
+	// Actual GitHub API calls would require authentication
+	t.Skip("Requires GitHub API token and network access")
+
+	ctx := context.Background()
+	token := "" // Placeholder - would need actual token
+	repoURL := "https://github.com/test-owner/test-repo"
+
+	_, err := AnalyzeRepository(ctx, repoURL, token)
+	if err != nil {
+		t.Logf("Expected error without valid token: %v", err)
+	}
 }
