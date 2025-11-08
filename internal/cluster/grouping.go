@@ -80,7 +80,7 @@ func (ra *RepositoryActivity) GroupIntoEpisodes(config GroupingConfig) []Episode
 			} else {
 				// Finalize current episode if it meets minimum criteria
 				if len(currentEpisode.Commits) >= config.MinCommits {
-					currentEpisode.ID = fmt.Sprintf("episode-%d", len(episodes)+1)
+					currentEpisode.ID = fmt.Sprintf("E%d", len(episodes)+1)
 					episodes = append(episodes, *currentEpisode)
 				}
 
