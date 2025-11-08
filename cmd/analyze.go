@@ -2,11 +2,9 @@ package cmd
 
 import (
 	"context"
-	"encoding/json"
 	"fmt"
 	"os"
 	"strings"
-	"time"
 
 	"github.com/Yates-Labs/thunk/internal/cluster"
 	"github.com/Yates-Labs/thunk/internal/orchestrator"
@@ -15,7 +13,7 @@ import (
 )
 
 var (
-	jsonOutput bool
+	exportFile string
 )
 
 var analyzeCmd = &cobra.Command{
@@ -32,14 +30,14 @@ Each episode shows:
 Examples:
   thunk analyze /path/to/local/repo
   thunk analyze https://github.com/user/repo
-  thunk analyze https://github.com/user/repo --json`,
+  thunk analyze https://github.com/user/repo --export episodes.json`,
 	Args: cobra.ExactArgs(1),
 	RunE: runAnalyze,
 }
 
 func init() {
 	rootCmd.AddCommand(analyzeCmd)
-	analyzeCmd.Flags().BoolVar(&jsonOutput, "json", false, "Output in JSON format")
+	analyzeCmd.Flags().StringVar(&exportFile, "export", "", "Export episodes to JSON file: --export <filename>")
 }
 
 func runAnalyze(cmd *cobra.Command, args []string) error {
@@ -57,48 +55,30 @@ func runAnalyze(cmd *cobra.Command, args []string) error {
 		return nil
 	}
 
-	// Output based on format
-	if jsonOutput {
-		return outputJSON(episodes)
+	// Handle export flag
+	if exportFile != "" {
+		return handleExport(episodes, exportFile)
 	}
 
+	// Default: output table
 	return outputTable(episodes)
 }
 
-func outputJSON(episodes []cluster.Episode) error {
-	// Create structured output
-	type EpisodeSummary struct {
-		ID          string    `json:"id"`
-		AuthorCount int       `json:"author_count"`
-		CommitCount int       `json:"commit_count"`
-		StartDate   time.Time `json:"start_date"`
-		EndDate     time.Time `json:"end_date"`
-		Duration    string    `json:"duration"`
+func handleExport(episodes []cluster.Episode, filename string) error {
+	// Create output file
+	file, err := os.Create(filename)
+	if err != nil {
+		return fmt.Errorf("failed to create export file: %w", err)
+	}
+	defer file.Close()
+
+	// Export episodes as JSON
+	if err := cluster.ExportEpisodes(episodes, "json", file); err != nil {
+		return fmt.Errorf("export failed: %w", err)
 	}
 
-	summaries := make([]EpisodeSummary, len(episodes))
-	for i, ep := range episodes {
-		authors := ep.GetCommitAuthors()
-		var startDate, endDate time.Time
-
-		if len(ep.Commits) > 0 {
-			startDate = ep.Commits[0].CommittedAt
-			endDate = ep.Commits[len(ep.Commits)-1].CommittedAt
-		}
-
-		summaries[i] = EpisodeSummary{
-			ID:          ep.ID,
-			AuthorCount: len(authors),
-			CommitCount: len(ep.Commits),
-			StartDate:   startDate,
-			EndDate:     endDate,
-			Duration:    ep.GetDuration().String(),
-		}
-	}
-
-	encoder := json.NewEncoder(os.Stdout)
-	encoder.SetIndent("", "  ")
-	return encoder.Encode(summaries)
+	fmt.Printf("✓ Exported %d episodes to %s\n", len(episodes), filename)
+	return nil
 }
 
 func outputTable(episodes []cluster.Episode) error {
