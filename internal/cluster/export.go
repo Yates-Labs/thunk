@@ -6,6 +6,8 @@ import (
 	"io"
 	"strings"
 	"time"
+
+	"github.com/Yates-Labs/thunk/internal/ingest/git"
 )
 
 // ExportFormat represents supported export formats
@@ -17,16 +19,18 @@ const (
 
 // EpisodeExport represents an episode with enrichment counts for export
 type EpisodeExport struct {
-	ID           string    `json:"id"`
-	CommitCount  int       `json:"commit_count"`
-	AuthorCount  int       `json:"author_count"`
-	PRCount      int       `json:"pr_count"`
-	IssueCount   int       `json:"issue_count"`
-	StartDate    time.Time `json:"start_date"`
-	EndDate      time.Time `json:"end_date"`
-	Duration     string    `json:"duration"`
-	Authors      []string  `json:"authors"`
-	CommitHashes []string  `json:"commit_hashes"`
+	ID           string       `json:"id"`
+	CommitCount  int          `json:"commit_count"`
+	AuthorCount  int          `json:"author_count"`
+	PRCount      int          `json:"pr_count"`
+	IssueCount   int          `json:"issue_count"`
+	StartDate    time.Time    `json:"start_date"`
+	EndDate      time.Time    `json:"end_date"`
+	Duration     string       `json:"duration"`
+	Authors      []string     `json:"authors"`
+	CommitHashes []string     `json:"commit_hashes"`
+	Commits      []git.Commit `json:"commits"`
+	Artifacts    []Artifact   `json:"artifacts"`
 }
 
 // ExportEpisodes exports episodes in JSON format
@@ -88,6 +92,8 @@ func enrichEpisode(ep Episode) EpisodeExport {
 		Duration:     ep.GetDuration().String(),
 		Authors:      authorNames,
 		CommitHashes: commitHashes,
+		Commits:      ep.Commits,
+		Artifacts:    ep.Artifacts,
 	}
 }
 

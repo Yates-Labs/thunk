@@ -43,6 +43,22 @@ func TestExportEpisodes_JSON(t *testing.T) {
 	if exports[0].PRCount != 1 {
 		t.Errorf("Expected 1 PR, got %d", exports[0].PRCount)
 	}
+
+	// Verify full commits are included
+	if len(exports[0].Commits) != 2 {
+		t.Errorf("Expected 2 full commits in export, got %d", len(exports[0].Commits))
+	}
+	if exports[0].Commits[0].Hash != "abc123" {
+		t.Errorf("Expected first commit hash 'abc123', got '%s'", exports[0].Commits[0].Hash)
+	}
+
+	// Verify full artifacts are included
+	if len(exports[0].Artifacts) != 1 {
+		t.Errorf("Expected 1 artifact in export, got %d", len(exports[0].Artifacts))
+	}
+	if exports[0].Artifacts[0].ID != "pr-1" {
+		t.Errorf("Expected artifact ID 'pr-1', got '%s'", exports[0].Artifacts[0].ID)
+	}
 }
 
 func TestExportEpisodes_UnsupportedFormat(t *testing.T) {
@@ -125,6 +141,14 @@ func TestEnrichEpisode(t *testing.T) {
 	}
 	if len(export.CommitHashes) != 2 {
 		t.Errorf("Expected 2 commit hashes, got %d", len(export.CommitHashes))
+	}
+
+	// Verify full commits and artifacts are included
+	if len(export.Commits) != 2 {
+		t.Errorf("Expected 2 commits, got %d", len(export.Commits))
+	}
+	if len(export.Artifacts) != 2 {
+		t.Errorf("Expected 2 artifacts, got %d", len(export.Artifacts))
 	}
 }
 
