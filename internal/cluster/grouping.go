@@ -95,7 +95,7 @@ func (ra *RepositoryActivity) GroupIntoEpisodes(config GroupingConfig) []Episode
 		// Check if this is the last commit
 		if i == len(commits)-1 && currentEpisode != nil {
 			if len(currentEpisode.Commits) >= config.MinCommits {
-				currentEpisode.ID = fmt.Sprintf("episode-%d", len(episodes)+1)
+				currentEpisode.ID = fmt.Sprintf("E%d", len(episodes)+1)
 				episodes = append(episodes, *currentEpisode)
 			}
 		}
