@@ -13,9 +13,7 @@ import (
 )
 
 func init() {
-	// Try to load .env from current directory, then parent directories
-	_ = godotenv.Load()
-	// Fallback: try loading from project root (../../.env from internal/orchestrator)
+	// Load .env
 	_ = godotenv.Load("../../.env")
 }
 
