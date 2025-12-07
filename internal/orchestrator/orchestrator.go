@@ -3,34 +3,45 @@ package orchestrator
 import (
 	"context"
 	"fmt"
+	"os"
 	"time"
 
 	"github.com/Yates-Labs/thunk/internal/adapter"
 	"github.com/Yates-Labs/thunk/internal/cluster"
 	"github.com/Yates-Labs/thunk/internal/ingest/git"
+	"github.com/joho/godotenv"
 )
+
+func init() {
+	// Try to load .env from current directory, then parent directories
+	_ = godotenv.Load()
+	// Fallback: try loading from project root (../../.env from internal/orchestrator)
+	_ = godotenv.Load("../../.env")
+}
 
 // AnalyzeRepository analyzes a Git repository and returns grouped episodes
 // The repo parameter can be either a local path or a remote URL
 // Uses default grouping configuration
-// Optional token parameter for accessing platform APIs (GitHub, GitLab, etc.)
+// Token is automatically loaded from GITHUB_TOKEN environment variable if not provided
 func AnalyzeRepository(ctx context.Context, repo string, token ...string) ([]cluster.Episode, error) {
 	config := cluster.DefaultGroupingConfig()
 	return AnalyzeRepositoryWithConfig(ctx, repo, config, token...)
 }
 
 // AnalyzeRepositoryWithConfig analyzes a repository with custom grouping configuration
-// Supports optional token for accessing platform APIs (GitHub, GitLab, etc.)
+// Token is automatically loaded from GITHUB_TOKEN environment variable if not provided
 func AnalyzeRepositoryWithConfig(ctx context.Context, repo string, config cluster.GroupingConfig, token ...string) ([]cluster.Episode, error) {
 	// Check for context cancellation
 	if err := ctx.Err(); err != nil {
 		return nil, fmt.Errorf("context cancelled before analysis: %w", err)
 	}
 
-	// Extract token if provided
+	// Extract token: use provided token, otherwise fall back to env var
 	var apiToken string
-	if len(token) > 0 {
+	if len(token) > 0 && token[0] != "" {
 		apiToken = token[0]
+	} else {
+		apiToken = os.Getenv("GITHUB_TOKEN")
 	}
 
 	// Step 1: Ingest repository data

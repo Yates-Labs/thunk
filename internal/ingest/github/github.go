@@ -4,16 +4,28 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"os"
 	"regexp"
 	"sort"
 	"strconv"
 
 	"github.com/google/go-github/v77/github"
+	"github.com/joho/godotenv"
 )
 
+func init() {
+	// Try to load .env from current directory, then parent directories
+	_ = godotenv.Load()
+	// Fallback: try loading from project root (../../../.env from internal/ingest/github)
+	_ = godotenv.Load("../../../.env")
+}
+
 // NewClient creates a GitHub API client with authentication
-// token: GitHub personal access token
+// If token is empty, attempts to load from GITHUB_TOKEN environment variable
 func NewClient(token string) *github.Client {
+	if token == "" {
+		token = os.Getenv("GITHUB_TOKEN")
+	}
 	return github.NewClient(nil).WithAuthToken(token)
 }
 

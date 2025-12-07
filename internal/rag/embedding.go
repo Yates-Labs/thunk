@@ -6,9 +6,17 @@ import (
 	"fmt"
 	"os"
 
+	"github.com/joho/godotenv"
 	"github.com/openai/openai-go"
 	"github.com/openai/openai-go/option"
 )
+
+func init() {
+	// Try to load .env from current directory, then parent directories
+	_ = godotenv.Load()
+	// Fallback: try loading from project root (../../.env from internal/rag)
+	_ = godotenv.Load("../../.env")
+}
 
 // Common errors for embedding operations
 var (
