@@ -52,5 +52,3 @@ go test -short ./...
 ./standalone_embed.sh start
 go test -v ./internal/rag/store/
 ```
-
-For more details on the Milvus integration, see [internal/rag/store/README.md](internal/rag/store/README.md).
