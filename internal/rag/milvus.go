@@ -1,4 +1,4 @@
-package store
+package rag
 
 import (
 	"context"
@@ -7,7 +7,6 @@ import (
 	"os"
 	"time"
 
-	"github.com/Yates-Labs/thunk/internal/rag"
 	"github.com/joho/godotenv"
 	"github.com/milvus-io/milvus-sdk-go/v2/client"
 	"github.com/milvus-io/milvus-sdk-go/v2/entity"
@@ -194,7 +193,7 @@ func (m *MilvusStore) ensureCollection(ctx context.Context) error {
 }
 
 // Insert adds embedding records to Milvus with metadata
-func (m *MilvusStore) Insert(ctx context.Context, records []rag.EmbeddingRecord, metadata map[string]interface{}) error {
+func (m *MilvusStore) Insert(ctx context.Context, records []EmbeddingRecord, metadata map[string]interface{}) error {
 	if len(records) == 0 {
 		return ErrEmptyRecords
 	}
@@ -346,6 +345,52 @@ func (m *MilvusStore) Search(ctx context.Context, queryVector []float32, topK in
 	}
 
 	return chunks, nil
+}
+
+// Query checks which episode IDs exist in the store
+func (m *MilvusStore) Query(ctx context.Context, episodeIDs []string) (map[string]bool, error) {
+	if len(episodeIDs) == 0 {
+		return map[string]bool{}, nil
+	}
+
+	// Build filter expression for the given episode IDs
+	expr := fmt.Sprintf(`episode_id == "%s"`, episodeIDs[0])
+	for i := 1; i < len(episodeIDs); i++ {
+		expr = fmt.Sprintf(`%s or episode_id == "%s"`, expr, episodeIDs[i])
+	}
+
+	// Query the collection to get matching episode IDs
+	// We use a simple query to get just the episode_id field
+	results, err := m.client.Query(
+		ctx,
+		m.config.CollectionName,
+		nil, // partition names
+		expr,
+		[]string{"episode_id"},
+	)
+	if err != nil {
+		return nil, fmt.Errorf("failed to query episodes: %w", err)
+	}
+
+	// Build existence map
+	existenceMap := make(map[string]bool, len(episodeIDs))
+	// Initialize all as non-existent
+	for _, id := range episodeIDs {
+		existenceMap[id] = false
+	}
+
+	// Mark found episodes as existing
+	for _, column := range results {
+		if column.Name() == "episode_id" {
+			if varcharCol, ok := column.(*entity.ColumnVarChar); ok {
+				for _, id := range varcharCol.Data() {
+					existenceMap[id] = true
+				}
+			}
+		}
+	}
+
+	return existenceMap, nil
 }
 
 // Delete removes records by episode IDs

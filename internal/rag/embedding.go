@@ -46,8 +46,8 @@ type Embedder interface {
 // OpenAIEmbedder implements the Embedder interface using OpenAI's API
 type OpenAIEmbedder struct {
 	client    openai.Client
-	model     string
-	dimension int
+	Model     string
+	Dimension int
 }
 
 // NewOpenAIEmbedder creates a new OpenAI embedder instance
@@ -61,19 +61,9 @@ func NewOpenAIEmbedder(model string, dimension int) (*OpenAIEmbedder, error) {
 
 	return &OpenAIEmbedder{
 		client:    client,
-		model:     model,
-		dimension: dimension,
+		Model:     model,
+		Dimension: dimension,
 	}, nil
-}
-
-// GetModel returns the embedding model identifier
-func (e *OpenAIEmbedder) GetModel() string {
-	return e.model
-}
-
-// GetDimension returns the embedding vector dimension
-func (e *OpenAIEmbedder) GetDimension() int {
-	return e.dimension
 }
 
 // Embed generates embeddings for the provided texts using OpenAI's API
@@ -86,8 +76,8 @@ func (e *OpenAIEmbedder) Embed(ctx context.Context, texts []string) ([]Embedding
 		Input: openai.EmbeddingNewParamsInputUnion{
 			OfArrayOfStrings: texts,
 		},
-		Model:          e.model,
-		Dimensions:     openai.Int(int64(e.dimension)),
+		Model:          e.Model,
+		Dimensions:     openai.Int(int64(e.Dimension)),
 		EncodingFormat: openai.EmbeddingNewParamsEncodingFormatFloat,
 	})
 	if err != nil {
@@ -106,7 +96,7 @@ func (e *OpenAIEmbedder) Embed(ctx context.Context, texts []string) ([]Embedding
 			Text:      texts[int(data.Index)],
 			Embedding: embedding,
 			Index:     int(data.Index),
-			Model:     e.model,
+			Model:     e.Model,
 		}
 	}
 

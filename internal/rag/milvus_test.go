@@ -1,4 +1,4 @@
-package store
+package rag
 
 import (
 	"context"
@@ -6,8 +6,6 @@ import (
 	"fmt"
 	"testing"
 	"time"
-
-	"github.com/Yates-Labs/thunk/internal/rag"
 )
 
 // TestMilvusStore_EmptyRecords tests error handling for empty records
@@ -25,7 +23,7 @@ func TestMilvusStore_EmptyRecords(t *testing.T) {
 		"episode_id": "E1",
 	}
 
-	err := store.Insert(ctx, []rag.EmbeddingRecord{}, metadata)
+	err := store.Insert(ctx, []EmbeddingRecord{}, metadata)
 	if err != ErrEmptyRecords {
 		t.Errorf("Expected ErrEmptyRecords, got: %v", err)
 	}
@@ -40,7 +38,7 @@ func TestMilvusStore_MissingMetadata(t *testing.T) {
 		config: config,
 	}
 
-	records := []rag.EmbeddingRecord{
+	records := []EmbeddingRecord{
 		{
 			Text:      "Test",
 			Embedding: make([]float32, 3072),
@@ -105,7 +103,7 @@ func TestMilvusStore_Integration_FullWorkflow(t *testing.T) {
 	// Clean up any existing data
 	_ = store.Delete(ctx, []string{"episode-001", "episode-002"})
 
-	embedder, err := rag.NewOpenAIEmbedder("text-embedding-3-small", 1536)
+	embedder, err := NewOpenAIEmbedder("text-embedding-3-small", 1536)
 	if err != nil {
 		t.Fatalf("failed to create embedder: %v", err)
 	}
@@ -277,7 +275,7 @@ func TestMilvusStore_Integration_SearchSimilarity(t *testing.T) {
 	// Clean up
 	_ = store.Delete(ctx, []string{"sim-001"})
 
-	embedder, err := rag.NewOpenAIEmbedder("text-embedding-3-small", 1536)
+	embedder, err := NewOpenAIEmbedder("text-embedding-3-small", 1536)
 	if err != nil {
 		t.Fatalf("failed to create embedder: %v", err)
 	}
@@ -365,7 +363,7 @@ func TestMilvusStore_Integration_BatchOperations(t *testing.T) {
 	// Clean up any existing data and wait for it to propagate
 	_ = store.Delete(ctx, episodeIDs)
 
-	embedder, err := rag.NewOpenAIEmbedder("text-embedding-3-small", 1536)
+	embedder, err := NewOpenAIEmbedder("text-embedding-3-small", 1536)
 	if err != nil {
 		t.Fatalf("failed to create embedder: %v", err)
 	}
@@ -466,7 +464,7 @@ func TestMilvusStore_Integration_LargeText(t *testing.T) {
 
 	_ = store.Delete(ctx, []string{"large-001"})
 
-	embedder, err := rag.NewOpenAIEmbedder("text-embedding-3-small", 1536)
+	embedder, err := NewOpenAIEmbedder("text-embedding-3-small", 1536)
 	if err != nil {
 		t.Fatalf("failed to create embedder: %v", err)
 	}

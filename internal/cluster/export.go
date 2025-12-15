@@ -52,11 +52,7 @@ func ExportEpisodes(episodes []Episode, format string, writer io.Writer) error {
 
 // enrichEpisode converts an Episode to EpisodeExport with calculated enrichments
 func enrichEpisode(ep Episode) EpisodeExport {
-	authors := ep.GetCommitAuthors()
-	authorNames := make([]string, len(authors))
-	for i, author := range authors {
-		authorNames[i] = author.Name
-	}
+	authorNames := ep.GetAuthorNames()
 
 	commitHashes := make([]string, len(ep.Commits))
 	for i, commit := range ep.Commits {
@@ -75,16 +71,12 @@ func enrichEpisode(ep Episode) EpisodeExport {
 		}
 	}
 
-	var startDate, endDate time.Time
-	if len(ep.Commits) > 0 {
-		startDate = ep.Commits[0].CommittedAt
-		endDate = ep.Commits[len(ep.Commits)-1].CommittedAt
-	}
+	startDate, endDate := ep.GetDateRange()
 
 	return EpisodeExport{
 		ID:           ep.ID,
 		CommitCount:  len(ep.Commits),
-		AuthorCount:  len(authors),
+		AuthorCount:  len(authorNames),
 		PRCount:      prCount,
 		IssueCount:   issueCount,
 		StartDate:    startDate,

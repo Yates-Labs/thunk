@@ -84,3 +84,109 @@ func (e *Episode) GetDuration() time.Duration {
 
 	return newest.Sub(oldest)
 }
+
+// GetAuthorNames extracts unique author names from commits and artifacts
+// Returns a sorted list of author names
+func (e *Episode) GetAuthorNames() []string {
+	authorMap := make(map[string]bool)
+
+	// Collect from commits
+	for _, commit := range e.Commits {
+		if commit.Author.Name != "" {
+			authorMap[commit.Author.Name] = true
+		}
+	}
+
+	// Collect from artifacts
+	for _, artifact := range e.Artifacts {
+		if artifact.Author.Name != "" {
+			authorMap[artifact.Author.Name] = true
+		}
+	}
+
+	// Convert to slice
+	authors := make([]string, 0, len(authorMap))
+	for author := range authorMap {
+		authors = append(authors, author)
+	}
+
+	return authors
+}
+
+// GetDateRange returns the start and end times for the episode
+// Examines both commits and artifacts to find the earliest and latest timestamps
+func (e *Episode) GetDateRange() (time.Time, time.Time) {
+	var earliest, latest time.Time
+
+	// Check commits
+	for _, commit := range e.Commits {
+		commitTime := commit.CommittedAt
+		if earliest.IsZero() || commitTime.Before(earliest) {
+			earliest = commitTime
+		}
+		if latest.IsZero() || commitTime.After(latest) {
+			latest = commitTime
+		}
+	}
+
+	// Check artifacts
+	for _, artifact := range e.Artifacts {
+		createdAt := artifact.CreatedAt
+		if earliest.IsZero() || createdAt.Before(earliest) {
+			earliest = createdAt
+		}
+
+		updatedAt := artifact.UpdatedAt
+		if latest.IsZero() || updatedAt.After(latest) {
+			latest = updatedAt
+		}
+
+		if artifact.ClosedAt != nil {
+			closedAt := *artifact.ClosedAt
+			if latest.IsZero() || closedAt.After(latest) {
+				latest = closedAt
+			}
+		}
+
+		if artifact.MergedAt != nil {
+			mergedAt := *artifact.MergedAt
+			if latest.IsZero() || mergedAt.After(latest) {
+				latest = mergedAt
+			}
+		}
+	}
+
+	return earliest, latest
+}
+
+// GetFileCount returns the total number of unique files changed across all commits
+func (e *Episode) GetFileCount() int {
+	fileSet := make(map[string]bool)
+
+	for _, commit := range e.Commits {
+		for _, diff := range commit.Diffs {
+			// Use FilePath as the primary identifier
+			if diff.FilePath != "" {
+				fileSet[diff.FilePath] = true
+			}
+			// Also track old path for renames
+			if diff.OldPath != "" && diff.OldPath != diff.FilePath {
+				fileSet[diff.OldPath] = true
+			}
+		}
+	}
+
+	// Also count files from PR metadata if available
+	for _, artifact := range e.Artifacts {
+		if artifact.Type == ArtifactPullRequest || artifact.Type == ArtifactMergeRequest {
+			// Use the ChangedFiles count from metadata as additional context
+			// but don't double-count with the commit diffs
+			if artifact.Metadata.ChangedFiles > len(fileSet) {
+				// This handles cases where we have PR metadata but not full commit diffs
+				return artifact.Metadata.ChangedFiles
+			}
+		}
+	}
+
+	return len(fileSet)
+}
