@@ -8,7 +8,9 @@ import (
 
 // SearchOptions provides filtering options for vector search
 type SearchOptions struct {
-	EpisodeIDs []string `json:"episode_ids,omitempty"` // Filter by specific episode IDs
+	EpisodeIDs []string               `json:"episode_ids,omitempty"` // Filter by specific episode IDs
+	Repository string                 `json:"repository,omitempty"`  // Filter by repository name
+	Metadata   map[string]interface{} `json:"metadata,omitempty"`    // Additional metadata filters
 }
 
 // ContextChunk represents a retrieved context with similarity score
@@ -100,32 +102,28 @@ func IndexEpisodes(
 			return fmt.Errorf("failed to generate embeddings for batch starting at %d: %w", batchStart, err)
 		}
 
-		// Insert each episode with its embedding and metadata
-		for i, record := range embeddingRecords {
-			episode := batch[i]
+		// Use batch insert for efficient storage
+		episodeRecords := make([]EpisodeRecord, len(batch))
+		for i, episode := range batch {
+			episodeRecords[i] = EpisodeRecord{
+				EpisodeID:   episode.EpisodeID,
+				Text:        embeddingRecords[i].Text,
+				Embedding:   embeddingRecords[i].Embedding,
+				StartDate:   episode.StartDate,
+				EndDate:     episode.EndDate,
+				Authors:     episode.Authors,
+				CommitCount: episode.CommitCount,
+				FileCount:   episode.FileCount,
+			}
+		}
 
-			// Prepare metadata for Milvus
-			metadata := map[string]interface{}{
-				"episode_id":   episode.EpisodeID,
-				"start_date":   episode.StartDate,
-				"end_date":     episode.EndDate,
-				"authors":      episode.Authors,
-				"commit_count": episode.CommitCount,
-				"file_count":   episode.FileCount,
-			}
+		if err := vectorStore.Insert(ctx, episodeRecords); err != nil {
+			return fmt.Errorf("failed to insert batch starting at %d: %w", batchStart, err)
+		}
 
-			// Handle zero time values
-			if episode.StartDate.IsZero() {
-				metadata["start_date"] = time.Time{}
-			}
-			if episode.EndDate.IsZero() {
-				metadata["end_date"] = time.Time{}
-			}
-
-			// Insert single record (Milvus Insert expects a slice)
-			if err := vectorStore.Insert(ctx, []EmbeddingRecord{record}, metadata); err != nil {
-				return fmt.Errorf("failed to insert episode %s: %w", episode.EpisodeID, err)
-			}
+		// Flush after each batch
+		if err := vectorStore.Flush(ctx); err != nil {
+			return fmt.Errorf("failed to flush batch starting at %d: %w", batchStart, err)
 		}
 	}
 

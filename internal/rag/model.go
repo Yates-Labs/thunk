@@ -5,13 +5,6 @@ import (
 	"time"
 )
 
-// Narrative contains generated explanatory text plus provenance and evaluation metadata.
-type Narrative struct {
-	EpisodeID   string    `json:"episode_id,omitempty"`
-	Content     string    `json:"content"`
-	GeneratedAt time.Time `json:"generated_at"`
-}
-
 // EpisodeSummary aggregates metrics and narrative for a cluster episode.
 type EpisodeSummary struct {
 	EpisodeID   string    `json:"episode_id"`
@@ -27,8 +20,11 @@ type EpisodeSummary struct {
 // VectorStore defines the interface for vector storage and similarity search
 // Implementations should support episode embeddings for RAG pipelines
 type VectorStore interface {
-	// Insert adds embedding records to the vector store
-	Insert(ctx context.Context, records []EmbeddingRecord, metadata map[string]interface{}) error
+	// Insert efficiently inserts multiple episodes in a single operation
+	Insert(ctx context.Context, episodes []EpisodeRecord) error
+
+	// Flush ensures all pending data is persisted
+	Flush(ctx context.Context) error
 
 	// Search performs top-K similarity search with optional filtering
 	Search(ctx context.Context, queryVector []float32, topK int, opts *SearchOptions) ([]ContextChunk, error)

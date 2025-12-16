@@ -35,12 +35,6 @@ type EmbeddingRecord struct {
 type Embedder interface {
 	// Embed generates embeddings for the provided texts
 	Embed(ctx context.Context, texts []string) ([]EmbeddingRecord, error)
-
-	// GetModel returns the embedding model identifier
-	GetModel() string
-
-	// GetDimension returns the embedding vector dimension
-	GetDimension() int
 }
 
 // OpenAIEmbedder implements the Embedder interface using OpenAI's API

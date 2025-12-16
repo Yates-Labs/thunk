@@ -7,6 +7,7 @@ import (
 
 	"github.com/Yates-Labs/thunk/internal/cluster"
 	"github.com/Yates-Labs/thunk/internal/ingest/git"
+	"github.com/Yates-Labs/thunk/internal/rag"
 )
 
 func TestAssemblePrompt_MissingTarget(t *testing.T) {
@@ -45,7 +46,7 @@ func TestAssemblePrompt_Smoke(t *testing.T) {
 		},
 	}
 
-	contextChunks := []ContextChunk{
+	contextChunks := []rag.ContextChunk{
 		{EpisodeID: "E2", Text: "Migrated user sessions to Redis", Score: 0.85},
 		{EpisodeID: "E3", Text: "Added OAuth2 integration", Score: 0.72},
 	}
@@ -120,9 +121,9 @@ func TestAssemblePrompt_ContextIncludesAllProvided(t *testing.T) {
 	}
 
 	// 10 chunks => should include all provided context chunks
-	contextChunks := make([]ContextChunk, 10)
+	contextChunks := make([]rag.ContextChunk, 10)
 	for i := 0; i < 10; i++ {
-		contextChunks[i] = ContextChunk{
+		contextChunks[i] = rag.ContextChunk{
 			EpisodeID: string(rune('A' + i)),
 			Text:      "Context",
 			Score:     float32(10 - i),
