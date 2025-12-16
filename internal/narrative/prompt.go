@@ -9,27 +9,26 @@ import (
 
 	"github.com/Yates-Labs/thunk/internal/cluster"
 	"github.com/Yates-Labs/thunk/internal/ingest/git"
-	"github.com/Yates-Labs/thunk/internal/rag/store"
 )
 
 var (
 	ErrMissingTargetEpisode = errors.New("target episode required for episode-level narrative")
 )
 
-func AssemblePrompt(targetEpisode *cluster.Episode, contextChunks []store.ContextChunk) (string, error) {
+func AssemblePrompt(targetEpisode *cluster.Episode, contextChunks []ContextChunk) (string, error) {
 	if targetEpisode == nil {
 		return "", ErrMissingTargetEpisode
 	}
 
 	// Sort context chunks by relevance score (highest first), even if already sorted.
-	sorted := make([]store.ContextChunk, len(contextChunks))
+	sorted := make([]ContextChunk, len(contextChunks))
 	copy(sorted, contextChunks)
 	sort.SliceStable(sorted, func(i, j int) bool { return sorted[i].Score > sorted[j].Score })
 
 	return assembleEpisodePrompt(targetEpisode, sorted), nil
 }
 
-func assembleEpisodePrompt(ep *cluster.Episode, contextChunks []store.ContextChunk) string {
+func assembleEpisodePrompt(ep *cluster.Episode, contextChunks []ContextChunk) string {
 	var b strings.Builder
 
 	b.WriteString("You are a technical writer specializing in software development narratives. ")
