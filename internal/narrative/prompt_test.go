@@ -7,7 +7,6 @@ import (
 
 	"github.com/Yates-Labs/thunk/internal/cluster"
 	"github.com/Yates-Labs/thunk/internal/ingest/git"
-	"github.com/Yates-Labs/thunk/internal/rag/store"
 )
 
 func TestAssemblePrompt_MissingTarget(t *testing.T) {
@@ -46,7 +45,7 @@ func TestAssemblePrompt_Smoke(t *testing.T) {
 		},
 	}
 
-	contextChunks := []store.ContextChunk{
+	contextChunks := []ContextChunk{
 		{EpisodeID: "E2", Text: "Migrated user sessions to Redis", Score: 0.85},
 		{EpisodeID: "E3", Text: "Added OAuth2 integration", Score: 0.72},
 	}
@@ -107,7 +106,7 @@ func TestAssemblePrompt_NoContext(t *testing.T) {
 	}
 }
 
-func TestAssemblePrompt_ContextLimitTop5(t *testing.T) {
+func TestAssemblePrompt_ContextIncludesAllProvided(t *testing.T) {
 	episode := &cluster.Episode{
 		ID: "E1",
 		Commits: []git.Commit{
@@ -120,10 +119,10 @@ func TestAssemblePrompt_ContextLimitTop5(t *testing.T) {
 		},
 	}
 
-	// 10 chunks => should include only top 5 in episode-level context section
-	contextChunks := make([]store.ContextChunk, 10)
+	// 10 chunks => should include all provided context chunks
+	contextChunks := make([]ContextChunk, 10)
 	for i := 0; i < 10; i++ {
-		contextChunks[i] = store.ContextChunk{
+		contextChunks[i] = ContextChunk{
 			EpisodeID: string(rune('A' + i)),
 			Text:      "Context",
 			Score:     float32(10 - i),
