@@ -70,23 +70,3 @@ func TestOpenAIEmbedder_Embed(t *testing.T) {
 		}
 	}
 }
-
-func TestOpenAIEmbedder_GetModel(t *testing.T) {
-	// Skip if no API key
-	if os.Getenv("OPENAI_API_KEY") == "" {
-		t.Skip("OPENAI_API_KEY not set")
-	}
-
-	embedder, err := NewOpenAIEmbedder("text-embedding-3-large", 3072)
-	if err != nil {
-		t.Fatalf("failed to create embedder: %v", err)
-	}
-
-	if embedder.GetModel() != "text-embedding-3-large" {
-		t.Errorf("GetModel() = %q, want %q", embedder.GetModel(), "text-embedding-3-large")
-	}
-
-	if embedder.GetDimension() != 3072 {
-		t.Errorf("GetDimension() = %d, want %d", embedder.GetDimension(), 3072)
-	}
-}

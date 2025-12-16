@@ -9,6 +9,7 @@ import (
 
 	"github.com/Yates-Labs/thunk/internal/cluster"
 	"github.com/Yates-Labs/thunk/internal/ingest/git"
+	"github.com/Yates-Labs/thunk/internal/rag"
 )
 
 func TestGenerator_Generate_Success(t *testing.T) {
@@ -30,7 +31,7 @@ func TestGenerator_Generate_Success(t *testing.T) {
 		},
 	}
 
-	contextChunks := []ContextChunk{
+	contextChunks := []rag.ContextChunk{
 		{EpisodeID: "E100", Text: "Previous auth work", Score: 0.85},
 	}
 
@@ -98,9 +99,6 @@ func TestGenerator_Generate_LLMError(t *testing.T) {
 
 	episode := &cluster.Episode{
 		ID: "E456",
-		Commits: []git.Commit{
-			{Hash: "def456", Message: "Fix bug", Author: git.Author{Name: "Bob"}},
-		},
 	}
 
 	ctx := context.Background()

@@ -2,6 +2,7 @@ package git
 
 import (
 	"fmt"
+	"sort"
 	"strings"
 	"time"
 
@@ -323,28 +324,35 @@ func ParseRepository(repo *git.Repository, url string, maxCommits int, includePa
 	}
 
 	// Associate commits with branches
+	// Sort branches to prioritize main/master so shared history is attributed to them
+	sort.Slice(branches, func(i, j int) bool {
+		nameI := branches[i].Name
+		nameJ := branches[j].Name
+
+		// Prioritize main and master
+		if nameI == "main" || nameI == "master" {
+			return true
+		}
+		if nameJ == "main" || nameJ == "master" {
+			return false
+		}
+
+		return nameI < nameJ
+	})
+
 	// Create a map of commit hash to branch for quick lookup
 	commitToBranch := make(map[string]*Branch)
 	for i := range branches {
 		branch := &branches[i]
-		// For each branch, get its commit history
-		branchRef, err := repo.Reference(plumbing.NewBranchReferenceName(branch.Name), true)
-		if err != nil {
-			// Try remote branch
-			branchRef, err = repo.Reference(plumbing.NewRemoteReferenceName("origin", branch.Name), true)
-			if err != nil {
-				continue
-			}
-		}
-		
+
 		// Get commit iterator for this branch
 		commitIter, err := repo.Log(&git.LogOptions{
-			From: branchRef.Hash(),
+			From: plumbing.NewHash(branch.Hash),
 		})
 		if err != nil {
 			continue
 		}
-		
+
 		// Mark all commits in this branch
 		commitIter.ForEach(func(c *object.Commit) error {
 			commitHash := c.Hash.String()
@@ -430,4 +438,20 @@ func GetContributorStats(commits []Commit) map[string]struct {
 	}
 
 	return stats
+}
+
+// GetRemoteURL returns the URL for a given remote name (e.g., "origin")
+// Returns empty string if remote doesn't exist
+func GetRemoteURL(repo *git.Repository, remoteName string) string {
+	remote, err := repo.Remote(remoteName)
+	if err != nil {
+		return ""
+	}
+
+	config := remote.Config()
+	if len(config.URLs) == 0 {
+		return ""
+	}
+
+	return config.URLs[0]
 }

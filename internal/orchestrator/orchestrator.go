@@ -9,13 +9,7 @@ import (
 	"github.com/Yates-Labs/thunk/internal/adapter"
 	"github.com/Yates-Labs/thunk/internal/cluster"
 	"github.com/Yates-Labs/thunk/internal/ingest/git"
-	"github.com/joho/godotenv"
 )
-
-func init() {
-	// Load .env
-	_ = godotenv.Load("../../.env")
-}
 
 // AnalyzeRepository analyzes a Git repository and returns grouped episodes
 // The repo parameter can be either a local path or a remote URL
@@ -63,7 +57,7 @@ func AnalyzeRepositoryWithConfig(ctx context.Context, repo string, config cluste
 // Supports both local paths and remote URLs
 // Detects platform from URL and fetches additional artifacts if token is provided
 func ingestRepository(ctx context.Context, repo, token string) (*cluster.RepositoryActivity, error) {
-	// Detect platform from URL
+	// Detect platform from URL or path
 	platform, owner, repoName := detectPlatform(repo)
 
 	// Try to open as local repository first
@@ -81,6 +75,19 @@ func ingestRepository(ctx context.Context, repo, token string) (*cluster.Reposit
 	repoData, err := git.ParseRepository(gitRepo, repo, 0, false)
 	if err != nil {
 		return nil, fmt.Errorf("failed to parse repository: %w", err)
+	}
+
+	// If owner/repo not detected from URL, try to get from git remotes
+	if owner == "" || repoName == "" {
+		remoteURL := git.GetRemoteURL(gitRepo, "origin")
+		if remoteURL != "" {
+			detectedPlatform, detectedOwner, detectedRepo := detectPlatform(remoteURL)
+			if detectedOwner != "" && detectedRepo != "" {
+				platform = detectedPlatform
+				owner = detectedOwner
+				repoName = detectedRepo
+			}
+		}
 	}
 
 	// Convert to RepositoryActivity

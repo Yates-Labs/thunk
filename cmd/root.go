@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"os"
 
+	"github.com/joho/godotenv"
 	"github.com/spf13/cobra"
 )
 
@@ -18,6 +19,9 @@ development activity as coherent episodes with timing and authorship details.`,
 
 // Execute runs the root command
 func Execute() {
+	// Load .env file if it exists
+	_ = godotenv.Load()
+
 	if err := rootCmd.Execute(); err != nil {
 		fmt.Fprintln(os.Stderr, err)
 		os.Exit(1)

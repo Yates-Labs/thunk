@@ -1,6 +1,58 @@
 # thunk
 Thunk is an LLM-powered tool that transforms Git repository histories into human-readable narratives of software evolution. It uses retrieval-augmented generation and long-context summarization to explain not just what changed in a codebase, but why it changed, helping developers understand design decisions and architectural progress over time.
 
+## Quick Start
+
+### Installation
+
+```bash
+go install github.com/Yates-Labs/thunk@latest
+```
+
+Or build from source:
+
+```bash
+git clone https://github.com/Yates-Labs/thunk.git
+cd thunk
+go build
+```
+
+### Basic Usage
+
+#### Analyze a Repository
+
+Analyze a repository and display development episodes:
+
+```bash
+# Local repository
+thunk analyze /path/to/repo
+
+# GitHub repository
+thunk analyze https://github.com/owner/repo
+
+# Export to JSON
+thunk analyze . --export episodes.json
+```
+
+#### Ask Questions (RAG)
+
+Ask natural language questions about a repository using RAG:
+
+```bash
+# Ask about recent changes
+thunk ask . "What were the main features added last month?"
+
+# Ask about specific functionality
+thunk ask /path/to/repo "Who worked on the authentication system?"
+
+# Retrieve more context
+thunk ask https://github.com/owner/repo "Summarize the bug fixes" --topk 10 --verbose
+```
+
+**Note:** The `ask` command requires:
+- `OPENAI_API_KEY` environment variable
+- Running Milvus instance (see [Running Milvus Locally](#running-milvus-locally))
+
 ## Development Setup
 
 ### Prerequisites

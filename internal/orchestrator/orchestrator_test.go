@@ -7,7 +7,6 @@ import (
 
 	"github.com/Yates-Labs/thunk/internal/adapter"
 	"github.com/Yates-Labs/thunk/internal/cluster"
-	"github.com/Yates-Labs/thunk/internal/ingest/git"
 	githubmodel "github.com/Yates-Labs/thunk/internal/ingest/github"
 )
 
@@ -239,14 +238,8 @@ func TestGitHubAdapterIntegration(t *testing.T) {
 	}
 	// Create repository activity
 	activity := &cluster.RepositoryActivity{
-		Platform:       ghAdapter.GetPlatform(),
-		RepositoryURL:  "https://github.com/test/repo",
-		RepositoryName: "repo",
-		Owner:          "test",
-		DefaultBranch:  "main",
-		Commits:        []git.Commit{},
-		Artifacts:      []cluster.Artifact{*issueArtifact, *prArtifact},
-		FetchedAt:      time.Now(),
+		Platform:  ghAdapter.GetPlatform(),
+		Artifacts: []cluster.Artifact{*issueArtifact, *prArtifact},
 	}
 
 	// Verify the activity

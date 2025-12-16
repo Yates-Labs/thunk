@@ -1,16 +1,13 @@
-package store
+package rag
 
 import (
 	"context"
-	"errors"
 	"fmt"
 	"testing"
 	"time"
-
-	"github.com/Yates-Labs/thunk/internal/rag"
 )
 
-// TestMilvusStore_EmptyRecords tests error handling for empty records
+// TestMilvusStore_EmptyRecords tests that empty records are handled gracefully (no-op)
 func TestMilvusStore_EmptyRecords(t *testing.T) {
 	ctx := context.Background()
 	config := DefaultMilvusConfig()
@@ -21,42 +18,10 @@ func TestMilvusStore_EmptyRecords(t *testing.T) {
 		config: config,
 	}
 
-	metadata := map[string]interface{}{
-		"episode_id": "E1",
-	}
-
-	err := store.Insert(ctx, []rag.EmbeddingRecord{}, metadata)
-	if err != ErrEmptyRecords {
-		t.Errorf("Expected ErrEmptyRecords, got: %v", err)
-	}
-}
-
-// TestMilvusStore_MissingMetadata tests error handling for missing metadata
-func TestMilvusStore_MissingMetadata(t *testing.T) {
-	ctx := context.Background()
-	config := DefaultMilvusConfig()
-
-	store := &MilvusStore{
-		config: config,
-	}
-
-	records := []rag.EmbeddingRecord{
-		{
-			Text:      "Test",
-			Embedding: make([]float32, 3072),
-			Index:     0,
-			Model:     "test-model",
-		},
-	}
-
-	// Missing episode_id in metadata
-	metadata := map[string]interface{}{
-		"start_date": time.Now(),
-	}
-
-	err := store.Insert(ctx, records, metadata)
-	if err == nil || !errors.Is(err, ErrMissingMetadata) {
-		t.Errorf("Expected ErrMissingMetadata, got: %v", err)
+	// Empty records should be a no-op
+	err := store.Insert(ctx, []EpisodeRecord{})
+	if err != nil {
+		t.Errorf("Expected nil for empty records, got: %v", err)
 	}
 }
 
@@ -105,7 +70,7 @@ func TestMilvusStore_Integration_FullWorkflow(t *testing.T) {
 	// Clean up any existing data
 	_ = store.Delete(ctx, []string{"episode-001", "episode-002"})
 
-	embedder, err := rag.NewOpenAIEmbedder("text-embedding-3-small", 1536)
+	embedder, err := NewOpenAIEmbedder("text-embedding-3-small", 1536)
 	if err != nil {
 		t.Fatalf("failed to create embedder: %v", err)
 	}
@@ -120,18 +85,24 @@ func TestMilvusStore_Integration_FullWorkflow(t *testing.T) {
 		t.Fatalf("failed to embed texts1: %v", err)
 	}
 
-	metadata1 := map[string]interface{}{
-		"episode_id":   "episode-001",
-		"start_date":   time.Date(2025, 1, 1, 0, 0, 0, 0, time.UTC),
-		"end_date":     time.Date(2025, 1, 2, 0, 0, 0, 0, time.UTC),
-		"authors":      []string{"alice@example.com", "bob@example.com"},
-		"commit_count": 5,
-		"file_count":   3,
+	episode1 := EpisodeRecord{
+		EpisodeID:   "episode-001",
+		Text:        "This is a commit about implementing authentication\nAdded user login functionality with JWT tokens",
+		Embedding:   records1[0].Embedding,
+		StartDate:   time.Date(2025, 1, 1, 0, 0, 0, 0, time.UTC),
+		EndDate:     time.Date(2025, 1, 2, 0, 0, 0, 0, time.UTC),
+		Authors:     []string{"alice@example.com", "bob@example.com"},
+		CommitCount: 5,
+		FileCount:   3,
 	}
 
-	err = store.Insert(ctx, records1, metadata1)
+	err = store.Insert(ctx, []EpisodeRecord{episode1})
 	if err != nil {
 		t.Fatalf("failed to insert episode-001: %v", err)
+	}
+	err = store.Flush(ctx)
+	if err != nil {
+		t.Fatalf("failed to flush episode-001: %v", err)
 	}
 	t.Log("✓ Inserted episode-001")
 
@@ -145,18 +116,24 @@ func TestMilvusStore_Integration_FullWorkflow(t *testing.T) {
 		t.Fatalf("failed to embed texts2: %v", err)
 	}
 
-	metadata2 := map[string]interface{}{
-		"episode_id":   "episode-002",
-		"start_date":   time.Date(2025, 1, 3, 0, 0, 0, 0, time.UTC),
-		"end_date":     time.Date(2025, 1, 4, 0, 0, 0, 0, time.UTC),
-		"authors":      []string{"charlie@example.com"},
-		"commit_count": 3,
-		"file_count":   2,
+	episode2 := EpisodeRecord{
+		EpisodeID:   "episode-002",
+		Text:        "Fixed database connection pooling issues\nOptimized query performance with indexes",
+		Embedding:   records2[0].Embedding,
+		StartDate:   time.Date(2025, 1, 3, 0, 0, 0, 0, time.UTC),
+		EndDate:     time.Date(2025, 1, 4, 0, 0, 0, 0, time.UTC),
+		Authors:     []string{"charlie@example.com"},
+		CommitCount: 3,
+		FileCount:   2,
 	}
 
-	err = store.Insert(ctx, records2, metadata2)
+	err = store.Insert(ctx, []EpisodeRecord{episode2})
 	if err != nil {
 		t.Fatalf("failed to insert episode-002: %v", err)
+	}
+	err = store.Flush(ctx)
+	if err != nil {
+		t.Fatalf("failed to flush episode-002: %v", err)
 	}
 	t.Log("✓ Inserted episode-002")
 
@@ -277,7 +254,7 @@ func TestMilvusStore_Integration_SearchSimilarity(t *testing.T) {
 	// Clean up
 	_ = store.Delete(ctx, []string{"sim-001"})
 
-	embedder, err := rag.NewOpenAIEmbedder("text-embedding-3-small", 1536)
+	embedder, err := NewOpenAIEmbedder("text-embedding-3-small", 1536)
 	if err != nil {
 		t.Fatalf("failed to create embedder: %v", err)
 	}
@@ -296,18 +273,27 @@ func TestMilvusStore_Integration_SearchSimilarity(t *testing.T) {
 		t.Fatalf("failed to embed texts: %v", err)
 	}
 
-	metadata := map[string]interface{}{
-		"episode_id":   "sim-001",
-		"start_date":   time.Now(),
-		"end_date":     time.Now(),
-		"authors":      []string{"test@example.com"},
-		"commit_count": 10,
-		"file_count":   5,
+	episodeRecords := make([]EpisodeRecord, len(records))
+	for i, record := range records {
+		episodeRecords[i] = EpisodeRecord{
+			EpisodeID:   "sim-001",
+			Text:        texts[i],
+			Embedding:   record.Embedding,
+			StartDate:   time.Now(),
+			EndDate:     time.Now(),
+			Authors:     []string{"test@example.com"},
+			CommitCount: 10,
+			FileCount:   5,
+		}
 	}
 
-	err = store.Insert(ctx, records, metadata)
+	err = store.Insert(ctx, episodeRecords)
 	if err != nil {
 		t.Fatalf("failed to insert: %v", err)
+	}
+	err = store.Flush(ctx)
+	if err != nil {
+		t.Fatalf("failed to flush: %v", err)
 	}
 	t.Log("✓ Inserted test documents")
 
@@ -365,7 +351,7 @@ func TestMilvusStore_Integration_BatchOperations(t *testing.T) {
 	// Clean up any existing data and wait for it to propagate
 	_ = store.Delete(ctx, episodeIDs)
 
-	embedder, err := rag.NewOpenAIEmbedder("text-embedding-3-small", 1536)
+	embedder, err := NewOpenAIEmbedder("text-embedding-3-small", 1536)
 	if err != nil {
 		t.Fatalf("failed to create embedder: %v", err)
 	}
@@ -384,25 +370,29 @@ func TestMilvusStore_Integration_BatchOperations(t *testing.T) {
 		t.Fatalf("failed to embed texts: %v", err)
 	}
 
-	// Insert multiple episodes using pre-embedded vectors
-	recordIndex := 0
+	// Insert multiple episodes using batch insert for better performance
+	episodeRecords := make([]EpisodeRecord, len(episodeIDs))
 	for i, episodeID := range episodeIDs {
-		records := allRecords[recordIndex : recordIndex+2]
-		recordIndex += 2
-
-		metadata := map[string]interface{}{
-			"episode_id":   episodeID,
-			"start_date":   time.Now().Add(time.Duration(i) * 24 * time.Hour),
-			"end_date":     time.Now().Add(time.Duration(i+1) * 24 * time.Hour),
-			"authors":      []string{fmt.Sprintf("author%d@example.com", i+1)},
-			"commit_count": (i + 1) * 5,
-			"file_count":   (i + 1) * 2,
+		episodeRecords[i] = EpisodeRecord{
+			EpisodeID:   episodeID,
+			Text:        allTexts[i],
+			Embedding:   allRecords[i].Embedding,
+			StartDate:   time.Now().Add(time.Duration(i) * 24 * time.Hour),
+			EndDate:     time.Now().Add(time.Duration(i+1) * 24 * time.Hour),
+			Authors:     []string{fmt.Sprintf("author%d@example.com", i+1)},
+			CommitCount: (i + 1) * 5,
+			FileCount:   (i + 1) * 2,
 		}
+	}
 
-		err = store.Insert(ctx, records, metadata)
-		if err != nil {
-			t.Fatalf("failed to insert %s: %v", episodeID, err)
-		}
+	err = store.Insert(ctx, episodeRecords)
+	if err != nil {
+		t.Fatalf("failed to batch insert episodes: %v", err)
+	}
+
+	err = store.Flush(ctx)
+	if err != nil {
+		t.Fatalf("failed to flush: %v", err)
 	}
 	t.Logf("✓ Inserted %d episodes", len(episodeIDs))
 
@@ -418,8 +408,8 @@ func TestMilvusStore_Integration_BatchOperations(t *testing.T) {
 		t.Fatalf("failed to search all: %v", err)
 	}
 
-	if len(allResults) != 4 {
-		t.Errorf("expected 4 results (2 per episode), got %d", len(allResults))
+	if len(allResults) != 2 {
+		t.Errorf("expected 2 results (1 per episode), got %d", len(allResults))
 	}
 	t.Logf("✓ Search returned %d results across all episodes", len(allResults))
 
@@ -466,7 +456,7 @@ func TestMilvusStore_Integration_LargeText(t *testing.T) {
 
 	_ = store.Delete(ctx, []string{"large-001"})
 
-	embedder, err := rag.NewOpenAIEmbedder("text-embedding-3-small", 1536)
+	embedder, err := NewOpenAIEmbedder("text-embedding-3-small", 1536)
 	if err != nil {
 		t.Fatalf("failed to create embedder: %v", err)
 	}
@@ -483,18 +473,24 @@ func TestMilvusStore_Integration_LargeText(t *testing.T) {
 		t.Fatalf("failed to embed large text: %v", err)
 	}
 
-	metadata := map[string]interface{}{
-		"episode_id":   "large-001",
-		"start_date":   time.Now(),
-		"end_date":     time.Now(),
-		"authors":      []string{"author@example.com"},
-		"commit_count": 1,
-		"file_count":   50,
+	episode := EpisodeRecord{
+		EpisodeID:   "large-001",
+		Text:        largeText,
+		Embedding:   records[0].Embedding,
+		StartDate:   time.Now(),
+		EndDate:     time.Now(),
+		Authors:     []string{"author@example.com"},
+		CommitCount: 1,
+		FileCount:   50,
 	}
 
-	err = store.Insert(ctx, records, metadata)
+	err = store.Insert(ctx, []EpisodeRecord{episode})
 	if err != nil {
 		t.Fatalf("failed to insert large text: %v", err)
+	}
+	err = store.Flush(ctx)
+	if err != nil {
+		t.Fatalf("failed to flush: %v", err)
 	}
 	t.Logf("✓ Inserted large text (%d characters)", len(largeText))
 

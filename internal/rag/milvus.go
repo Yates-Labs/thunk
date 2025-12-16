@@ -1,4 +1,4 @@
-package store
+package rag
 
 import (
 	"context"
@@ -7,7 +7,6 @@ import (
 	"os"
 	"time"
 
-	"github.com/Yates-Labs/thunk/internal/rag"
 	"github.com/joho/godotenv"
 	"github.com/milvus-io/milvus-sdk-go/v2/client"
 	"github.com/milvus-io/milvus-sdk-go/v2/entity"
@@ -193,54 +192,55 @@ func (m *MilvusStore) ensureCollection(ctx context.Context) error {
 	return nil
 }
 
-// Insert adds embedding records to Milvus with metadata
-func (m *MilvusStore) Insert(ctx context.Context, records []rag.EmbeddingRecord, metadata map[string]interface{}) error {
-	if len(records) == 0 {
-		return ErrEmptyRecords
+// EpisodeRecord represents an episode with its embedding and metadata for batch insertion
+type EpisodeRecord struct {
+	EpisodeID   string
+	Text        string
+	Embedding   []float32
+	StartDate   time.Time
+	EndDate     time.Time
+	Authors     []string
+	CommitCount int
+	FileCount   int
+}
+
+// Insert efficiently inserts multiple episodes in a single Milvus operation
+// This is much faster than calling Insert multiple times
+func (m *MilvusStore) Insert(ctx context.Context, episodes []EpisodeRecord) error {
+	if len(episodes) == 0 {
+		return nil
 	}
 
-	// Validate required metadata
-	episodeID, ok := metadata["episode_id"].(string)
-	if !ok || episodeID == "" {
-		return fmt.Errorf("%w: episode_id", ErrMissingMetadata)
-	}
+	// Prepare column data for all episodes at once
+	episodeIDs := make([]string, len(episodes))
+	texts := make([]string, len(episodes))
+	embeddings := make([][]float32, len(episodes))
+	startDates := make([]int64, len(episodes))
+	endDates := make([]int64, len(episodes))
+	authorsStr := make([]string, len(episodes))
+	commitCounts := make([]int64, len(episodes))
+	fileCounts := make([]int64, len(episodes))
 
-	startDate, _ := metadata["start_date"].(time.Time)
-	endDate, _ := metadata["end_date"].(time.Time)
-	authors, _ := metadata["authors"].([]string)
-	commitCount, _ := metadata["commit_count"].(int)
-	fileCount, _ := metadata["file_count"].(int)
+	for i, ep := range episodes {
+		episodeIDs[i] = ep.EpisodeID
+		texts[i] = ep.Text
+		embeddings[i] = ep.Embedding
+		startDates[i] = ep.StartDate.Unix()
+		endDates[i] = ep.EndDate.Unix()
 
-	// Prepare column data
-	episodeIDs := make([]string, len(records))
-	texts := make([]string, len(records))
-	embeddings := make([][]float32, len(records))
-	startDates := make([]int64, len(records))
-	endDates := make([]int64, len(records))
-	authorsStr := make([]string, len(records))
-	commitCounts := make([]int64, len(records))
-	fileCounts := make([]int64, len(records))
-
-	authorsJoined := ""
-	if len(authors) > 0 {
-		authorsJoined = authors[0]
-		for i := 1; i < len(authors); i++ {
-			authorsJoined += "," + authors[i]
+		// Join authors
+		if len(ep.Authors) > 0 {
+			authorsStr[i] = ep.Authors[0]
+			for j := 1; j < len(ep.Authors); j++ {
+				authorsStr[i] += "," + ep.Authors[j]
+			}
 		}
+
+		commitCounts[i] = int64(ep.CommitCount)
+		fileCounts[i] = int64(ep.FileCount)
 	}
 
-	for i, record := range records {
-		episodeIDs[i] = episodeID
-		texts[i] = record.Text
-		embeddings[i] = record.Embedding
-		startDates[i] = startDate.Unix()
-		endDates[i] = endDate.Unix()
-		authorsStr[i] = authorsJoined
-		commitCounts[i] = int64(commitCount)
-		fileCounts[i] = int64(fileCount)
-	}
-
-	// Insert data
+	// Insert all episodes in one operation
 	columns := []entity.Column{
 		entity.NewColumnVarChar("episode_id", episodeIDs),
 		entity.NewColumnVarChar("text", texts),
@@ -256,11 +256,15 @@ func (m *MilvusStore) Insert(ctx context.Context, records []rag.EmbeddingRecord,
 		return fmt.Errorf("%w: %v", ErrInsertFailed, err)
 	}
 
-	// Flush to ensure data is persisted
+	return nil
+}
+
+// Flush ensures all pending data is persisted to Milvus
+// Call this after a batch of Insert operations
+func (m *MilvusStore) Flush(ctx context.Context) error {
 	if err := m.client.Flush(ctx, m.config.CollectionName, false); err != nil {
 		return fmt.Errorf("failed to flush data: %w", err)
 	}
-
 	return nil
 }
 
@@ -346,6 +350,52 @@ func (m *MilvusStore) Search(ctx context.Context, queryVector []float32, topK in
 	}
 
 	return chunks, nil
+}
+
+// Query checks which episode IDs exist in the store
+func (m *MilvusStore) Query(ctx context.Context, episodeIDs []string) (map[string]bool, error) {
+	if len(episodeIDs) == 0 {
+		return map[string]bool{}, nil
+	}
+
+	// Build filter expression for the given episode IDs
+	expr := fmt.Sprintf(`episode_id == "%s"`, episodeIDs[0])
+	for i := 1; i < len(episodeIDs); i++ {
+		expr = fmt.Sprintf(`%s or episode_id == "%s"`, expr, episodeIDs[i])
+	}
+
+	// Query the collection to get matching episode IDs
+	// We use a simple query to get just the episode_id field
+	results, err := m.client.Query(
+		ctx,
+		m.config.CollectionName,
+		nil, // partition names
+		expr,
+		[]string{"episode_id"},
+	)
+	if err != nil {
+		return nil, fmt.Errorf("failed to query episodes: %w", err)
+	}
+
+	// Build existence map
+	existenceMap := make(map[string]bool, len(episodeIDs))
+	// Initialize all as non-existent
+	for _, id := range episodeIDs {
+		existenceMap[id] = false
+	}
+
+	// Mark found episodes as existing
+	for _, column := range results {
+		if column.Name() == "episode_id" {
+			if varcharCol, ok := column.(*entity.ColumnVarChar); ok {
+				for _, id := range varcharCol.Data() {
+					existenceMap[id] = true
+				}
+			}
+		}
+	}
+
+	return existenceMap, nil
 }
 
 // Delete removes records by episode IDs
