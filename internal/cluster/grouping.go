@@ -364,7 +364,7 @@ func addReferencedArtifacts(episode *Episode, commit git.Commit, refMap map[stri
 		}
 	}
 
-	// Also check if commit hash is referenced in artifact discussions
+	// Check if commit hash is referenced in artifact discussions
 	for i := range allArtifacts {
 		artifact := &allArtifacts[i]
 		if existingArtifacts[artifact.ID] {
@@ -376,6 +376,46 @@ func addReferencedArtifacts(episode *Episode, commit git.Commit, refMap map[stri
 				episode.Artifacts = append(episode.Artifacts, *artifact)
 				existingArtifacts[artifact.ID] = true
 				break
+			}
+		}
+	}
+
+	// Check if commit hash matches PR merge commit SHA
+	for i := range allArtifacts {
+		artifact := &allArtifacts[i]
+		if existingArtifacts[artifact.ID] {
+			continue
+		}
+
+		if artifact.Type == ArtifactPullRequest &&
+			artifact.Metadata.MergeCommitSHA == commit.Hash {
+			episode.Artifacts = append(episode.Artifacts, *artifact)
+			existingArtifacts[artifact.ID] = true
+		}
+	}
+
+	// Match PRs by branch name if commit is on a feature branch
+	if commit.Branch != nil && commit.Branch.Name != "main" && commit.Branch.Name != "master" {
+		branchName := commit.Branch.Name
+		// Strip remote prefix if present (e.g., origin/feature -> feature)
+		if strings.Contains(branchName, "/") {
+			parts := strings.Split(branchName, "/")
+			if len(parts) > 1 {
+				branchName = parts[len(parts)-1]
+			}
+		}
+
+		for i := range allArtifacts {
+			artifact := &allArtifacts[i]
+			if existingArtifacts[artifact.ID] {
+				continue
+			}
+
+			// Match PR if head branch matches commit branch
+			if artifact.Type == ArtifactPullRequest &&
+				artifact.Metadata.HeadBranch == branchName {
+				episode.Artifacts = append(episode.Artifacts, *artifact)
+				existingArtifacts[artifact.ID] = true
 			}
 		}
 	}

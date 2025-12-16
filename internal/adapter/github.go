@@ -203,6 +203,7 @@ func convertGitHubPullRequest(pr *githubmodel.PullRequest) *cluster.Artifact {
 	artifact.Metadata = cluster.ArtifactMetadata{
 		BaseBranch:       pr.BaseBranch,
 		HeadBranch:       pr.HeadBranch,
+		MergeCommitSHA:   pr.MergeCommitSHA,
 		Additions:        pr.Additions,
 		Deletions:        pr.Deletions,
 		ChangedFiles:     pr.ChangedFiles,

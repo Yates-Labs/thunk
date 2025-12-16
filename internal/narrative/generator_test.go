@@ -99,9 +99,6 @@ func TestGenerator_Generate_LLMError(t *testing.T) {
 
 	episode := &cluster.Episode{
 		ID: "E456",
-		Commits: []git.Commit{
-			{Hash: "def456", Message: "Fix bug", Author: git.Author{Name: "Bob"}},
-		},
 	}
 
 	ctx := context.Background()

@@ -64,13 +64,14 @@ type Artifact struct {
 // ArtifactMetadata contains type-specific metadata for artifacts
 type ArtifactMetadata struct {
 	// Pull Request / Merge Request specific
-	BaseBranch   string `json:"base_branch,omitempty"`
-	HeadBranch   string `json:"head_branch,omitempty"`
-	Additions    int    `json:"additions,omitempty"`
-	Deletions    int    `json:"deletions,omitempty"`
-	ChangedFiles int    `json:"changed_files,omitempty"`
-	ReviewState  string `json:"review_state,omitempty"`
-	IsDraft      bool   `json:"is_draft,omitempty"`
+	BaseBranch     string `json:"base_branch,omitempty"`
+	HeadBranch     string `json:"head_branch,omitempty"`
+	MergeCommitSHA string `json:"merge_commit_sha,omitempty"`
+	Additions      int    `json:"additions,omitempty"`
+	Deletions      int    `json:"deletions,omitempty"`
+	ChangedFiles   int    `json:"changed_files,omitempty"`
+	ReviewState    string `json:"review_state,omitempty"`
+	IsDraft        bool   `json:"is_draft,omitempty"`
 
 	// Issue / Ticket specific
 	Priority  string     `json:"priority,omitempty"`

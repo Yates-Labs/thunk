@@ -121,6 +121,9 @@ func (e *Episode) GetDateRange() (time.Time, time.Time) {
 	// Check commits
 	for _, commit := range e.Commits {
 		commitTime := commit.CommittedAt
+		if commitTime.IsZero() {
+			continue
+		}
 		if earliest.IsZero() || commitTime.Before(earliest) {
 			earliest = commitTime
 		}
@@ -132,25 +135,25 @@ func (e *Episode) GetDateRange() (time.Time, time.Time) {
 	// Check artifacts
 	for _, artifact := range e.Artifacts {
 		createdAt := artifact.CreatedAt
-		if earliest.IsZero() || createdAt.Before(earliest) {
+		if !createdAt.IsZero() && (earliest.IsZero() || createdAt.Before(earliest)) {
 			earliest = createdAt
 		}
 
 		updatedAt := artifact.UpdatedAt
-		if latest.IsZero() || updatedAt.After(latest) {
+		if !updatedAt.IsZero() && (latest.IsZero() || updatedAt.After(latest)) {
 			latest = updatedAt
 		}
 
 		if artifact.ClosedAt != nil {
 			closedAt := *artifact.ClosedAt
-			if latest.IsZero() || closedAt.After(latest) {
+			if !closedAt.IsZero() && (latest.IsZero() || closedAt.After(latest)) {
 				latest = closedAt
 			}
 		}
 
 		if artifact.MergedAt != nil {
 			mergedAt := *artifact.MergedAt
-			if latest.IsZero() || mergedAt.After(latest) {
+			if !mergedAt.IsZero() && (latest.IsZero() || mergedAt.After(latest)) {
 				latest = mergedAt
 			}
 		}
