@@ -1,6 +1,7 @@
 package cluster
 
 import (
+	"sort"
 	"time"
 
 	"github.com/Yates-Labs/thunk/internal/ingest/git"
@@ -110,6 +111,7 @@ func (e *Episode) GetAuthorNames() []string {
 		authors = append(authors, author)
 	}
 
+	sort.Strings(authors)
 	return authors
 }
 

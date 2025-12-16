@@ -376,7 +376,7 @@ func generateEpisodeSummaryText(ep *cluster.Episode) string {
 	}
 
 	// Add metadata
-	authors := ep.GetCommitAuthors()
+	authors := ep.GetAuthorNames()
 	if len(authors) > 0 {
 		summary += fmt.Sprintf("\nAuthors: %s\n", authors[0])
 		for i := 1; i < len(authors) && i < 5; i++ {
